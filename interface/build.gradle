@@ -1,0 +1,28 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+/*
+ * Copyright (c) 2021 William Hubbard. All Rights Reserved.
+ */
+
+// In this section you declare where to find the dependencies of your project
+repositories {
+    mavenCentral()
+}
+
+// In this section you declare the dependencies for your production and test code
+dependencies {
+    // The production code uses the SLF4J logging API at compile time
+    implementation 'org.slf4j:slf4j-api:1.7.25'
+
+    // Declare the dependency for your favourite test framework you want to use in your tests.
+    // TestNG is also supported by the Gradle Test task. Just change the
+    // testCompile dependency to testCompile 'org.testng:testng:6.8.1' and add
+    // 'test.useTestNG()' to your build script.
+    testImplementation 'junit:junit:4.12'
+}
+
+// Define the main class for the application
+mainClassName = defaultPackage + '.player.Interface'
