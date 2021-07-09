@@ -7,6 +7,7 @@ package edu.regis.universe_player.player;
 import java.awt.BorderLayout;
 
 import javax.swing.JFrame;
+import javax.swing.JScrollPane;
 
 /**
  * The Interface class serves as the primary GUI that the player interacts with.
@@ -29,6 +30,10 @@ public class Interface extends JFrame
         this.getContentPane().setLayout(new BorderLayout());
         this.getContentPane().add(new Collections(), BorderLayout.LINE_START);
         this.getContentPane().add(new PlayerControls(), BorderLayout.PAGE_END);
+
+        JScrollPane songList = new JScrollPane(new SongList());
+        this.getContentPane().add(songList, BorderLayout.CENTER);
+
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
 }
