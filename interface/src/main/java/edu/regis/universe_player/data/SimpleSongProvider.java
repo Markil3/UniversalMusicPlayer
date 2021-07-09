@@ -32,7 +32,7 @@ public class SimpleSongProvider implements SongProvider
             String albumName, albumArtist;
             Album album;
             for (int albumNum = 0, numAlbums = random
-                    .nextInt(5) + 5; albumNum < numAlbums; albumNum++)
+                    .nextInt(20) + 20; albumNum < numAlbums; albumNum++)
             {
                 builder = new StringBuilder();
                 for (int i = 0, l = random.nextInt(10) + 10; i < l; i++)

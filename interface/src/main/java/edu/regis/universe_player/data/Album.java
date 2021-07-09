@@ -4,8 +4,6 @@
 
 package edu.regis.universe_player.data;
 
-import java.awt.Image;
-
 import javax.swing.ImageIcon;
 
 public class Album implements Comparable<Album>
