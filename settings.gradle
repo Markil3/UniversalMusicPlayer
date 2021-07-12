@@ -21,3 +21,4 @@ include 'services:webservice'
 
 rootProject.name = 'UniversalMusicPlayer'
 include ':interface'
+include ':add-on'

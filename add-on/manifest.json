@@ -1,0 +1,30 @@
+{
+  "description": "An add-on to link the Universal Music Player to compatible web music players.",
+  "manifest_version": 2,
+  "name": "Universal Music Addon",
+  "version": "0.1",
+  "icons": {
+    "16": "icon.svg",
+    "32": "icon.svg",
+    "64": "icon.svg",
+    "128": "icon.svg",
+    "256": "icon.svg",
+    "512": "icon.svg"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "universal_music@regis.edu",
+      "strict_min_version": "55.0"
+    }
+  },
+
+  "background": {
+    "scripts": ["background.js"]
+  },
+
+  "browser_action": {
+    "default_icon": "icon.svg"
+  },
+
+  "permissions": ["nativeMessaging"]
+}

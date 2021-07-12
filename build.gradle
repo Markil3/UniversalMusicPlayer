@@ -10,3 +10,10 @@
  * user guide available at https://docs.gradle.org/4.4.1/userguide/tutorial_java_projects.html
  */
 ext.defaultPackage = "edu.regis.universe_player"
+
+task bundleAddOn(type: Zip)
+{
+    archiveName = "universal_music@regis.edu.xpi"
+    destinationDir = file("./browser/profile/extensions")
+    from (files("./add-on"))
+}

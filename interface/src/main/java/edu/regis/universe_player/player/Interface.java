@@ -8,11 +8,17 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
+import java.io.IOException;
 import java.util.Collection;
 
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 
+import edu.regis.universe_player.browser.Browser;
+import edu.regis.universe_player.browser.MessageManager;
 import edu.regis.universe_player.data.CollectionType;
 import edu.regis.universe_player.data.Song;
 
@@ -22,7 +28,7 @@ import edu.regis.universe_player.data.Song;
  * @author William Hubbard
  * @version 0.1
  */
-public class Interface extends JFrame implements SongDisplayListener, ComponentListener
+public class Interface extends JFrame implements SongDisplayListener, ComponentListener, WindowListener, PlaybackCommandListener
 {
     /**
      * A reference to the panel containing links to different collection views.
@@ -41,9 +47,32 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
      */
     private JScrollPane centerView;
 
+    /**
+     * A link to the browser.
+     */
+    private MessageManager browser;
+
     public static void main(String[] args)
     {
+        try
+        {
+            Browser.launchBrowser();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, e, "Could not open browser background", JOptionPane.ERROR_MESSAGE);
+        }
         Interface inter = new Interface();
+        try
+        {
+            inter.browser = new MessageManager();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null, e, "Could not open browser communication", JOptionPane.ERROR_MESSAGE);
+        }
         inter.pack();
         inter.setVisible(true);
     }
@@ -54,12 +83,16 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     public Interface()
     {
         super();
+        PlayerControls controls;
+
         this.setTitle("Universal Music Player");
         this.getContentPane().setLayout(new BorderLayout());
         this.getContentPane()
             .add(this.collectionTypes = new Collections(), BorderLayout.LINE_START);
         this.collectionTypes.addSongDisplayListener(this);
-        this.getContentPane().add(new PlayerControls(), BorderLayout.PAGE_END);
+        controls = new PlayerControls();
+        controls.addCommandListener(this);
+        this.getContentPane().add(controls, BorderLayout.PAGE_END);
 
         this.songList = new SongList();
         this.collectionList = new CollectionList();
@@ -70,6 +103,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         this.componentResized(null);
 
         this.addComponentListener(this);
+        this.addWindowListener(this);
 
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
@@ -129,5 +163,92 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     public void componentHidden(ComponentEvent event)
     {
 
+    }
+
+    @Override
+    public void windowOpened(WindowEvent windowEvent)
+    {
+
+    }
+
+    @Override
+    public void windowClosing(WindowEvent windowEvent)
+    {
+        Browser.closeBrowser();
+        if (this.browser != null)
+        {
+            try
+            {
+                this.browser.close();
+            }
+            catch (IOException e)
+            {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    @Override
+    public void windowClosed(WindowEvent windowEvent)
+    {
+    }
+
+    @Override
+    public void windowIconified(WindowEvent windowEvent)
+    {
+
+    }
+
+    @Override
+    public void windowDeiconified(WindowEvent windowEvent)
+    {
+
+    }
+
+    @Override
+    public void windowActivated(WindowEvent windowEvent)
+    {
+
+    }
+
+    @Override
+    public void windowDeactivated(WindowEvent windowEvent)
+    {
+
+    }
+
+    /**
+     * Called when a playback command is issued.
+     *
+     * @param command - The command issued.
+     * @param data    - Additional data relevent to the command.
+     */
+    @Override
+    public void onCommand(PlaybackCommand command, Object data)
+    {
+        Object message = null;
+        if (this.browser != null)
+        {
+            synchronized (this.browser)
+            {
+                try
+                {
+                    this.browser.ping();
+                    message = this.browser.getMessage();
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(this, e, "Could not send message to browser", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }
+        if (message != null)
+        {
+            if ("ping".equals(message))
+            {
+                JOptionPane.showMessageDialog(this, "Ping received!");
+            }
+        }
     }
 }
