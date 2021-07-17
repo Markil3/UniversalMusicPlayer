@@ -4,3 +4,8 @@
 /*/build/
 /local.properties
 /browser/profile/extensions/universal_music@regis.edu.xpi
+/browser/profile/cache2/*
+/browser/profile/datareporting/*
+/browser/profile/startupCache/*
+/browser/profile/sessionstore-backups/*
+/browser/profile/lock
