@@ -9,7 +9,7 @@
  * For more details take a look at the Java Quickstart chapter in the Gradle
  * user guide available at https://docs.gradle.org/4.4.1/userguide/tutorial_java_projects.html
  */
-ext.defaultPackage = "edu.regis.universe_player"
+ext.defaultPackage = "edu.regis.universeplayer"
 
 task bundleAddOn(type: Zip)
 {

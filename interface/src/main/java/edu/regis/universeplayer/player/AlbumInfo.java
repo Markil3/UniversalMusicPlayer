@@ -2,14 +2,14 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player.player;
+package edu.regis.universeplayer.player;
 
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SpringLayout;
 
-import edu.regis.universe_player.data.Album;
+import edu.regis.universeplayer.data.Album;
 
 /**
  * This panel will display information on an album.

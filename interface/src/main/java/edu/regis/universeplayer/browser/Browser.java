@@ -2,7 +2,7 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player.browser;
+package edu.regis.universeplayer.browser;
 
 import com.google.gson.Gson;
 import com.google.gson.stream.JsonWriter;
@@ -10,7 +10,6 @@ import com.google.gson.stream.JsonWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.net.URL;
 
 /**
  * This serves as a central point for controlling the browser process.
@@ -25,7 +24,7 @@ public class Browser
     /**
      * Utility method for launching a browser instance
      *
-     * @throws IOException
+     * @throws IOException - Thrown if there is a problem launching the browser.
      */
     public static void launchBrowser() throws IOException
     {

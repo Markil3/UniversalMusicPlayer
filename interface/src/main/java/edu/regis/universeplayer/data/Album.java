@@ -2,7 +2,7 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player.data;
+package edu.regis.universeplayer.data;
 
 import javax.swing.ImageIcon;
 

@@ -2,22 +2,16 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player.browser;
+package edu.regis.universeplayer.browser;
 
 import com.google.gson.Gson;
 import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.PrintStream;
-import java.io.Reader;
-import java.util.Scanner;
 
 /**
  * This class will send messages to the

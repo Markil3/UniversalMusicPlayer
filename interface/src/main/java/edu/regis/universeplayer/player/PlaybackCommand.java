@@ -2,7 +2,7 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player.player;
+package edu.regis.universeplayer.player;
 
 /**
  * Contains possible playback commands that the play can send.

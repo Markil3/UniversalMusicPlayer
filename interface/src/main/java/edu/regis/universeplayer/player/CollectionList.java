@@ -2,14 +2,9 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player.player;
+package edu.regis.universeplayer.player;
 
 import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.GridLayout;
-import java.awt.Insets;
-import java.awt.event.MouseEvent;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -22,11 +17,11 @@ import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
-import edu.regis.universe_player.ClickListener;
-import edu.regis.universe_player.data.Album;
-import edu.regis.universe_player.data.CollectionType;
-import edu.regis.universe_player.data.Song;
-import edu.regis.universe_player.data.SongProvider;
+import edu.regis.universeplayer.ClickListener;
+import edu.regis.universeplayer.data.Album;
+import edu.regis.universeplayer.data.CollectionType;
+import edu.regis.universeplayer.data.Song;
+import edu.regis.universeplayer.data.SongProvider;
 
 /**
  * This panel will list all the song collections on display (albums, artists, genres, etc.)

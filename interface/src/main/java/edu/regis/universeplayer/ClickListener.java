@@ -2,7 +2,7 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player;
+package edu.regis.universeplayer;
 
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;

@@ -2,9 +2,9 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player;
+package edu.regis.universeplayer;
 
-import edu.regis.universe_player.data.Song;
+import edu.regis.universeplayer.data.Song;
 
 /**
  * This interface serves as the connection to a music player of some sort, whether it be

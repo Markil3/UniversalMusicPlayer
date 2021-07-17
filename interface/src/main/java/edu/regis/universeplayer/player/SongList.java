@@ -2,30 +2,23 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player.player;
+package edu.regis.universeplayer.player;
 
-import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.GridLayout;
 import java.awt.Insets;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.swing.BoxLayout;
-import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.SpringLayout;
 
-import edu.regis.universe_player.data.Album;
-import edu.regis.universe_player.data.SimpleSongProvider;
-import edu.regis.universe_player.data.Song;
-import edu.regis.universe_player.data.SongProvider;
+import edu.regis.universeplayer.data.Album;
+import edu.regis.universeplayer.data.Song;
+import edu.regis.universeplayer.data.SongProvider;
 
 /**
  * This panel will list all the songs that are to be currently displayed.

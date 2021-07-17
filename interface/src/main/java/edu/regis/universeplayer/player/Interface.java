@@ -2,7 +2,7 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player.player;
+package edu.regis.universeplayer.player;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -17,10 +17,10 @@ import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 
-import edu.regis.universe_player.browser.Browser;
-import edu.regis.universe_player.browser.MessageManager;
-import edu.regis.universe_player.data.CollectionType;
-import edu.regis.universe_player.data.Song;
+import edu.regis.universeplayer.browser.Browser;
+import edu.regis.universeplayer.browser.MessageManager;
+import edu.regis.universeplayer.data.CollectionType;
+import edu.regis.universeplayer.data.Song;
 
 /**
  * The Interface class serves as the primary GUI that the player interacts with.

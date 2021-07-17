@@ -2,23 +2,20 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player.player;
+package edu.regis.universeplayer.player;
 
 import java.awt.Color;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.List;
 
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
-import edu.regis.universe_player.ClickListener;
-import edu.regis.universe_player.data.CollectionType;
-import edu.regis.universe_player.data.Song;
-import edu.regis.universe_player.data.SongProvider;
+import edu.regis.universeplayer.ClickListener;
+import edu.regis.universeplayer.data.CollectionType;
+import edu.regis.universeplayer.data.Song;
+import edu.regis.universeplayer.data.SongProvider;
 
 /**
  * This panel links to various song collections the player has set up.

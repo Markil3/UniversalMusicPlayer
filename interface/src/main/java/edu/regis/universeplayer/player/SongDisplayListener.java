@@ -2,13 +2,13 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universe_player.player;
+package edu.regis.universeplayer.player;
 
 import java.util.Collection;
 import java.util.EventListener;
 
-import edu.regis.universe_player.data.CollectionType;
-import edu.regis.universe_player.data.Song;
+import edu.regis.universeplayer.data.CollectionType;
+import edu.regis.universeplayer.data.Song;
 
 /**
  * A callback that is triggered whenever one element believes that the interface center display needs to be updated.
