@@ -1,0 +1,21 @@
+buildscript {
+    repositories {
+        jcenter()
+        google()
+    }
+}
+
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+}
+
+sourceSets {
+    main {
+        java.srcDirs = ['src']
+        resources.srcDirs = ['src']
+    }
+}
+

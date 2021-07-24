@@ -7,8 +7,7 @@ package edu.regis.universeplayer.localPlayer;
 import java.io.IOException;
 import java.io.InputStream;
 
-import wave.WavHeader;
-import wave.WavHeaderReader;
+import com.intervigil.wave.WaveReader;
 
 /**
  * Contains information on a WAV audio file, along with a reference to the stream of raw data.
@@ -20,7 +19,7 @@ public class AudioFile extends InputStream
     /**
      * Contains header information.
      */
-    private final WavHeaderReader header;
+    private final WaveReader header;
     /**
      * Contains a link to the process reading the audio file.
      */
@@ -40,13 +39,13 @@ public class AudioFile extends InputStream
     {
         this.process = stream;
         this.stream = stream.getInputStream();
-        this.header = new WavHeaderReader(this.stream);
-        this.header.read();
+        this.header = new WaveReader(this.stream);
+        this.header.openWave();
     }
 
-    public WavHeader getHeader()
+    public WaveReader getHeader()
     {
-        return this.header.getHeader();
+        return this.header;
     }
 
     /**
@@ -55,7 +54,11 @@ public class AudioFile extends InputStream
      */
     public byte[] getByteStream()
     {
-        return this.header.getBuf();
+        try {
+            return this.header.getHeaderBytes();
+        } catch (IOException e) {
+            throw new RuntimeException("Could not recreate header");
+        }
     }
 
     @Override
@@ -68,5 +71,11 @@ public class AudioFile extends InputStream
     public int available() throws IOException
     {
         return this.process.isAlive() ? Integer.MAX_VALUE : super.available();
+    }
+
+    @Override
+    public void close() throws IOException {
+        super.close();
+        this.header.closeWaveFile();
     }
 }

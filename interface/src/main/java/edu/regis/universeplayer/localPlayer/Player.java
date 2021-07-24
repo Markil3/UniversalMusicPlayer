@@ -3,14 +3,14 @@
  */
 package edu.regis.universeplayer.localPlayer;
 
+import com.intervigil.wave.WaveReader;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedList;
-
-import wave.WavHeader;
 
 /**
  * This allows for the control of playback of files on the local file system
@@ -36,11 +36,11 @@ public class Player
      */
     public void setCurrentFile(AudioFile file)
     {
-        WavHeader header = file.getHeader();
+        WaveReader header = file.getHeader();
         this.currentFile = file;
         // TODO - Ensure that bytes per sample and bits per sample don't bother things
-        this.currentId = this.setCurrentFile(this.currentFile, header.getNumChannels(), header
-                .getBitsPerSample(), header.getSampleRate());
+        this.currentId = this.setCurrentFile(this.currentFile, (short) header.getChannels(), (short) header
+                .getPcmFormat(), header.getSampleRate());
     }
 
     /**

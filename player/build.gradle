@@ -16,17 +16,20 @@ library {
         def compileTask = binary.compileTask.get()
         compileTask.includes.from("${Jvm.current().javaHome}/include")
 
+        compileTask.source.from fileTree(dir: "src/main/c", include: "player.c")
+
         def osFamily = binary.targetPlatform.targetMachine.operatingSystemFamily
         if (osFamily.macOs) {
             compileTask.includes.from("${Jvm.current().javaHome}/include/darwin")
+            compileTask.source.from fileTree(dir: "src/main/c", include: "player_mac.c")
         } else if (osFamily.linux) {
             compileTask.includes.from("${Jvm.current().javaHome}/include/linux")
+            compileTask.source.from fileTree(dir: "src/main/c", include: "player_alsa.c")
         } else if (osFamily.windows) {
             compileTask.includes.from("${Jvm.current().javaHome}/include/win32")
+            compileTask.source.from fileTree(dir: "src/main/c", include: "player_win.c")
         }
-
-        compileTask.source.from fileTree(dir: "src/main/c", include: "**/*.c")
-
+		
         def toolChain = binary.toolChain
         if (toolChain instanceof VisualCpp) {
             compileTask.compilerArgs.addAll(["/TC"])
