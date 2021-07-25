@@ -1,0 +1,135 @@
+/*
+ * Copyright (c) 2021 William Hubbard. All Rights Reserved.
+ */
+
+
+import java.nio.file.CopyOption
+import java.nio.file.Files
+import java.nio.file.Path
+import org.apache.tools.ant.taskdefs.condition.Os
+
+import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
+import java.util.stream.Stream
+
+plugins {
+    id 'java'
+    id 'application'
+}
+
+// In this section you declare where to find the dependencies of your project
+repositories {
+    mavenCentral()
+}
+
+// In this section you declare the dependencies for your production and test code
+dependencies {
+    implementation 'org.slf4j:slf4j-api:1.7.30'
+    implementation 'org.apache.logging.log4j:log4j-api:2.13.3'
+    implementation 'org.apache.logging.log4j:log4j-core:2.13.3'
+    implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.13.3'
+
+    // Declare the dependency for your favourite test framework you want to use in your tests.
+    // TestNG is also supported by the Gradle Test task. Just change the
+    // testCompile dependency to testCompile 'org.testng:testng:6.8.1' and add
+    // 'test.useTestNG()' to your build script.
+    testImplementation 'junit:junit:4.12'
+}
+
+abstract class BuildManifest extends DefaultTask {
+    @InputDirectory
+    final abstract DirectoryProperty inputFile = project.objects.directoryProperty()
+    @OutputFile
+    final abstract RegularFileProperty outputFile = project.objects.fileProperty().convention(project.layout.buildDirectory.file("manifest.json"))
+
+    @TaskAction
+    void join() {
+        File startupScript
+        Stream<File> files = Arrays.stream(inputFile.get().asFile.listFiles())
+        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+            startupScript = files.filter(file -> file.getName().endsWith(".bat")).findFirst().get()
+        }
+        else if (Os.isFamily(Os.FAMILY_UNIX)) {
+            startupScript = files.filter(file -> !file.getName().endsWith(".bat")).findFirst().get()
+        }
+        else {
+            throw new RuntimeException("Unknown OS family")
+        }
+        outputFile.get().asFile.text = "{\n" +
+                "  \"name\": \"universalmusic\",\n" +
+                "  \"description\": \"A link between the Universal Music Player and the web browser.\",\n" +
+                "  \"path\": \"" + startupScript.getAbsolutePath() + "\",\n" +
+                "  \"type\": \"stdio\",\n" +
+                "  \"allowed_extensions\": [\"universalmusic@regis.edu\"]\n" +
+                "}"
+    }
+}
+
+TaskProvider<BuildManifest> buildManifestP = tasks.register("buildManifest", BuildManifest) {
+    inputFile = tasks.named("startScripts", org.gradle.jvm.application.tasks.CreateStartScripts).get().outputDir
+}
+
+buildManifest.dependsOn(startScripts)
+
+abstract class InstallAddon extends DefaultTask {
+    @InputFile
+    final abstract RegularFileProperty inputFile = project.objects.fileProperty()
+    @Internal
+    final abstract DirectoryProperty build = project.layout.buildDirectory
+    @InputDirectory
+    final abstract DirectoryProperty libsDir = project.objects.directoryProperty()
+
+    @TaskAction
+    void join() {
+        Path lib = libsDir.get().asFile.toPath()
+        Path link = new File(build.get().asFile, "lib").toPath()
+        try {
+            // This takes up more space than I would like, but Windows doesn't allow symbolic links without superuser privliges
+            Files.walk(lib).forEach(file -> {
+                Path fileName = lib.relativize(file)
+                Path dest = link.resolve(fileName)
+                println fileName.toString() + ": " + file.toString() + " to " + dest.toString()
+                if (!Files.exists(dest)) {
+                    try {
+                        Files.copy(file, dest)
+                    }
+                    catch (IOException e)
+                    {
+                        throw new RuntimeException("Could not link " + file.toString() + " to " + dest.toString(), e)
+                    }
+                }
+            })
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Could not link " + lib.toString() + " to " + link.toString(), e)
+        }
+
+
+        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+            Runtime.getRuntime()
+                    .exec("REG ADD HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts /v universalmusic /d \""
+                            + inputFile.get().asFile.getAbsolutePath() + "\" ")
+        }
+        else if (Os.isFamily(Os.FAMILY_MAC)) {
+            Files.copy(inputFile.get().asFile.toPath(), Paths.get(System.getProperty("user.home"), "Library/Application Support/Mozilla/NativeMessagingHosts", inputFile.get().asFile.getName()))
+        }
+        else if (Os.isFamily(Os.FAMILY_UNIX)) {
+            Files.copy(inputFile.get().asFile.toPath(), Paths.get(System.getProperty("user.home"), ".mozilla/native-messaging-hosts", inputFile.get().asFile.getName()))
+        }
+    }
+}
+
+TaskProvider<InstallAddon> installAddonP = tasks.register("installAddon", InstallAddon) {
+    inputFile = buildManifestP.get().outputFile
+    libsDir = jar.destinationDirectory
+}
+
+installAddon.dependsOn(buildManifest)
+
+run.dependsOn(installAddon)
+
+// Define the main class for the application
+mainClassName = defaultPackage + '.addon.Main'
+
+compileJava.dependsOn rootProject.bundleAddOn

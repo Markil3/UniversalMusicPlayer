@@ -4,11 +4,10 @@
 
 package edu.regis.universeplayer.browser;
 
-import com.google.gson.Gson;
-import com.google.gson.stream.JsonWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 
 /**
@@ -19,8 +18,10 @@ import java.io.IOException;
  */
 public class Browser
 {
+    private static Logger logger = LoggerFactory.getLogger(Browser.class);
+    
     private static Process process;
-
+    
     /**
      * Utility method for launching a browser instance
      *
@@ -30,116 +31,63 @@ public class Browser
     {
         String os = System.getProperty("os.name").toLowerCase();
         String arch = System.getProperty("os.arch").toLowerCase();
-        String args = " -profile browser/profile";
-        if (process != null && process.isAlive())
+        String args;
+        int startExit;
+        File browserDir = new File(System.getProperty("user.dir"), "browser");
+        
+        if (!browserDir.exists())
         {
-            process.destroy();
+            browserDir = new File(System.getProperty("user.dir"), "../browser");
         }
-
+        args = " -profile \"" + browserDir.getAbsolutePath() + "/profile\"";
+        logger.info("Running on {} {}", os, arch);
+//        System.getProperties().entrySet().stream().forEach(entry -> logger.info("{}: {}", entry.getKey(), entry.getValue()));
         if (os.contains("windows"))
         {
-            setupWindows();
-            process = Runtime.getRuntime().exec("browser/windows/FirefoxPortable.exe" + args);
-        }
-        else if (os.contains("linux"))
-        {
-            setupLinux();
             if (arch.contains("64"))
             {
-                process = Runtime.getRuntime().exec("./browser/linux64/firefox" + args);
+                logger.info("Starting Windows x86_64 browser");
+                process = Runtime.getRuntime().exec(new File(browserDir, "windows64/firefox.exe").getAbsolutePath() + args);
             }
             else
             {
-                process = Runtime.getRuntime().exec("./browser/linux32/firefox" + args);
+                logger.info("Starting Windows x86 browser");
+                process = Runtime.getRuntime().exec(new File(browserDir, "windows32/firefox.exe").getAbsolutePath() + args);
             }
         }
-
-        System.out.println(os);
-    }
-
-    /**
-     * Performs first-time setup for Windows applications.
-     */
-    private static void setupWindows()
-    {
-        try
+        else if (os.contains("linux"))
         {
-            Runtime.getRuntime()
-                   .exec("REG ADD HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts /v universal_music /d \"" + System
-                           .getProperty("user.dir") + "\\bin\\interface.bat\" ");
+            if (arch.contains("64"))
+            {
+                logger.info("Starting Linux x86_64 browser");
+                process = Runtime.getRuntime().exec(new File(browserDir, "linux64/firefox").getAbsolutePath() + args);
+            }
+            else
+            {
+                logger.info("Starting Linux 86 browser");
+                process = Runtime.getRuntime().exec(new File(browserDir, "linux32/firefox").getAbsolutePath() + args);
+            }
         }
-        catch (IOException e)
+        if (process == null)
         {
-            System.err.println("Could not set Windows registry key.");
-            e.printStackTrace();
+            throw new IOException("Could not find Firefox installation for OS " + os + " " + arch);
         }
     }
-
-    /**
-     * Performs first-time setup for OSX applications.
-     */
-    private static void setupMac()
-    {
-        Gson gson = new Gson();
-        try (JsonWriter writer = gson.newJsonWriter(new FileWriter(new File(System
-                .getProperty("user.home"), "Library/Application Support/Mozilla/NativeMessagingHosts/universal_music.json"))))
-        {
-            writeManifest(writer, System.getProperty("user.dir") + "/bin/interface");
-        }
-        catch (IOException e)
-        {
-            System.err.println("Could not set Mac application manifest.");
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Performs first-time setup for Linux applications.
-     */
-    private static void setupLinux()
-    {
-        Gson gson = new Gson();
-        try (JsonWriter writer = gson.newJsonWriter(new FileWriter(new File(System
-                .getProperty("user.home"), ".mozilla/native-messaging-hosts/universal_music.json"))))
-        {
-            writeManifest(writer, System.getProperty("user.dir") + "/bin/interface");
-        }
-        catch (IOException e)
-        {
-            System.err.println("Could not set Linux application manifest.");
-            e.printStackTrace();
-        }
-    }
-
-    private static void writeManifest(JsonWriter writer, String path) throws IOException
-    {
-        writer.beginObject();
-
-        writer.name("name");
-        writer.value("universal_music");
-        writer.name("description");
-        writer.value("Universal Music Player");
-        writer.name("path");
-        writer.value(path);
-        writer.name("type");
-        writer.value("stdio");
-
-        writer.name("allowed_extensions");
-        writer.beginArray();
-        writer.value("universal_music@regis.edu");
-        writer.endArray();
-
-        writer.endObject();
-    }
-
+    
     /**
      * Tells the browser process to shut down.
      */
     public static void closeBrowser()
     {
-        if (process != null && process.isAlive())
+        if (process != null)
         {
+            logger.info("Destroying browser processes {}, {}", process, process.descendants().toArray(ProcessHandle[]::new));
+            process.descendants().forEach(ProcessHandle::destroy);
             process.destroy();
+        }
+        else
+        {
+            logger.info("Process already destroyed.");
         }
     }
 }

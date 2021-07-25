@@ -1,2 +1,0 @@
-aus5.mozilla.org:HSTS	0	18820	1657603618166,1,0,2
-location.services.mozilla.com:HSTS	0	18820	1657602560679,1,1,2

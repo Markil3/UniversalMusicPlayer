@@ -4,6 +4,8 @@
 package edu.regis.universeplayer.localPlayer;
 
 import com.intervigil.wave.WaveReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -20,6 +22,8 @@ import java.util.LinkedList;
  */
 public class Player
 {
+    private static final Logger logger = LoggerFactory.getLogger(Player.class);
+
     static
     {
         System.loadLibrary("player");
@@ -81,7 +85,7 @@ public class Player
         }
         catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error("Could not save WAVE file", e);
         }
     }
 
@@ -166,7 +170,7 @@ public class Player
         }
         catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error("Could not save audio file " + file, e);
         }
         // Compare JNI vs Java
         try (AudioFile stream = getAudioStream(new File(args[0])))
@@ -177,7 +181,7 @@ public class Player
         }
         catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error("Could not save audio file " + file, e);
         }
     }
 }
