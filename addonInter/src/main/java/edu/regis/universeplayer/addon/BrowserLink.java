@@ -43,6 +43,10 @@ public class BrowserLink implements Runnable
      * This queue serves as a cache for objects we need to send.
      */
     private final LinkedList<MessagePacket> sendQueue = new LinkedList<>();
+    /**
+     * This queue serves as a cache for objects that are waiting for a response.
+     */
+    private final LinkedList<MessagePacket> sentQueue = new LinkedList<>();
     
     private boolean running;
     
@@ -69,30 +73,69 @@ public class BrowserLink implements Runnable
                 {
                     try
                     {
+                        logger.debug("Writing message {} {}", packet.message[0], packet.message[1]);
                         this.browserOut.write(packet.message[0]);
                         this.browserOut.write(packet.message[1]);
                         this.browserOut.flush();
                         
-                        /*
-                         * Wait for a response from the browser.
-                         */
-                        byte[][] returnMessage = this.readMessage();
-                        packet.returnMessage = returnMessage;
-                        if (returnMessage == null)
+                        synchronized (this.sentQueue)
                         {
-                            logger.info("Browser connection closed.");
-                            this.running = false;
-                        }
-                        synchronized (this.readLock)
-                        {
-                            logger.trace("Received message, notifying futures.");
-                            this.readLock.notifyAll();
+                            this.sentQueue.add(packet);
                         }
                     }
                     catch (IOException e)
                     {
                         logger.error("Could not send message " + new String(packet.message[1], StandardCharsets.UTF_8), e);
                     }
+                }
+                
+                try
+                {
+                    packet = null;
+                    synchronized (this.sentQueue)
+                    {
+                        if (this.sentQueue.size() > 0)
+                        {
+                            packet = this.sentQueue.poll();
+                        }
+                    }
+                    if (packet != null)
+                    {
+                        if (this.browserIn.available() > 0)
+                        {
+                            /*
+                             * Wait for a response from the browser.
+                             */
+                            byte[][] returnMessage = this.readMessage();
+                            if (returnMessage == null)
+                            {
+                                logger.info("Browser connection closed.");
+                                this.running = false;
+                            }
+                            else
+                            {
+                                logger.debug("Reading message {} {}", returnMessage[0], returnMessage[1]);
+                                packet.returnMessage = returnMessage;
+                                synchronized (this.readLock)
+                                {
+                                    logger.trace("Received message, notifying futures.");
+                                    this.readLock.notifyAll();
+                                }
+                            }
+                        }
+                        else
+                        {
+                            synchronized (this.sentQueue)
+                            {
+                                this.sentQueue.addFirst(packet);
+                            }
+                            logger.trace("There are no new messages");
+                        }
+                    }
+                }
+                catch (IOException e)
+                {
+                    logger.error("Could not retrieve message", e);
                 }
             }
         }
@@ -200,7 +243,6 @@ public class BrowserLink implements Runnable
          */
         header.order(ByteOrder.nativeOrder());
         header.putInt(messageData.length);
-        logger.debug("Writing message {} {}", header.array(), messageJson);
         
         packetEntry = new MessagePacket(new byte[][] {header.array(), messageData});
         
