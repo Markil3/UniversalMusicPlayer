@@ -13,7 +13,7 @@ ext.defaultPackage = "edu.regis.universeplayer"
 
 task bundleAddOn(type: Zip)
 {
-    archiveName = "universal_music@regis.edu.xpi"
+    archiveName = "universalmusic@regis.edu.xpi"
     destinationDir = file("./browser/profile/extensions")
     from (files("./add-on"))
 }

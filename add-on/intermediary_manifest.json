@@ -1,7 +1,0 @@
-{
-  "name": "universal_music",
-  "description": "A link between the Universal Music Player and the web browser.",
-  "path": "${LINK_PATH}",
-  "type": "stdio",
-  "allowed_extensions": ["universal_music@regis.edu"]
-}

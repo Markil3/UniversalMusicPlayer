@@ -13,7 +13,7 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "universal_music@regis.edu",
+      "id": "universalmusic@regis.edu",
       "strict_min_version": "55.0"
     }
   },

@@ -39,10 +39,10 @@ targetCompatibility = JavaVersion.VERSION_16
 mainClassName = defaultPackage + '.player.Interface'
 //mainClassName = defaultPackage + '.localPlayer.Player'
 
-compileJava.dependsOn rootProject.bundleAddOn
-
 run {
     systemProperty "java.library.path", file("${project(":player").buildDir}/lib/main/debug").absolutePath
 }
 
+compileJava.dependsOn rootProject.bundleAddOn
 compileJava.dependsOn ':player:linkDebug'
+compileJava.dependsOn ':addonInter:installAddon'

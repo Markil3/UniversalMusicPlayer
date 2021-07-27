@@ -1,29 +1,20 @@
-var port = browser.runtime.connectNative("universal_music")
+console.log("Hello from Universal Music addon!")
+/*
+On startup, connect to the "ping_pong" app.
+*/
+var port = browser.runtime.connectNative("universalmusic");
 
-/**
- * Sends a message to the application
- */
-function writeMessage(message)
-{
-    port.postMessage(message)
-}
+/*
+Listen for messages from the app.
+*/
+port.onMessage.addListener((response) => {
+  console.log("Received: " + response);
+});
 
-/**
- * Sends a message to the application
- */
-function onAppMessage(message)
-{
-    if ("command" in message)
-    {
-        switch (message["command"])
-        {
-        case "ping":
-            writeMessage({
-                "response": "ping"
-            });
-            break
-        }
-    }
-}
-
-port.onMessage.addListener(onAppMessage);
+/*
+On a click on the browser action, send the app a message.
+*/
+browser.browserAction.onClicked.addListener(() => {
+  console.log("Sending:  ping");
+  port.postMessage("ping");
+});

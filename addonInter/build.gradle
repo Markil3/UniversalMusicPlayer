@@ -29,6 +29,8 @@ dependencies {
     implementation 'org.apache.logging.log4j:log4j-core:2.13.3'
     implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.13.3'
 
+    implementation 'com.google.code.gson:gson:2.8.7'
+
     // Declare the dependency for your favourite test framework you want to use in your tests.
     // TestNG is also supported by the Gradle Test task. Just change the
     // testCompile dependency to testCompile 'org.testng:testng:6.8.1' and add
@@ -40,12 +42,14 @@ abstract class BuildManifest extends DefaultTask {
     @InputDirectory
     final abstract DirectoryProperty inputFile = project.objects.directoryProperty()
     @OutputFile
-    final abstract RegularFileProperty outputFile = project.objects.fileProperty().convention(project.layout.buildDirectory.file("manifest.json"))
+    final abstract RegularFileProperty outputFile = project.objects.fileProperty().convention(project.layout.buildDirectory.file("universalmusic.json"))
 
     @TaskAction
     void join() {
         File startupScript
-        Stream<File> files = Arrays.stream(inputFile.get().asFile.listFiles())
+        File binFiles = new File(inputFile.get().asFile, "bin")
+        print binFiles
+        Stream<File> files = Arrays.stream(binFiles.listFiles())
         if (Os.isFamily(Os.FAMILY_WINDOWS)) {
             startupScript = files.filter(file -> file.getName().endsWith(".bat")).findFirst().get()
         }
@@ -58,7 +62,7 @@ abstract class BuildManifest extends DefaultTask {
         outputFile.get().asFile.text = "{\n" +
                 "  \"name\": \"universalmusic\",\n" +
                 "  \"description\": \"A link between the Universal Music Player and the web browser.\",\n" +
-                "  \"path\": \"" + startupScript.getAbsolutePath() + "\",\n" +
+                "  \"path\": \"" + startupScript.getAbsolutePath().replace("\\", "\\\\") + "\",\n" +
                 "  \"type\": \"stdio\",\n" +
                 "  \"allowed_extensions\": [\"universalmusic@regis.edu\"]\n" +
                 "}"
@@ -66,50 +70,25 @@ abstract class BuildManifest extends DefaultTask {
 }
 
 TaskProvider<BuildManifest> buildManifestP = tasks.register("buildManifest", BuildManifest) {
-    inputFile = tasks.named("startScripts", org.gradle.jvm.application.tasks.CreateStartScripts).get().outputDir
+    inputFile = tasks.named("installDist", Sync).get().destinationDir
 }
 
-buildManifest.dependsOn(startScripts)
+buildManifest.dependsOn(installDist)
 
 abstract class InstallAddon extends DefaultTask {
     @InputFile
     final abstract RegularFileProperty inputFile = project.objects.fileProperty()
-    @Internal
-    final abstract DirectoryProperty build = project.layout.buildDirectory
-    @InputDirectory
-    final abstract DirectoryProperty libsDir = project.objects.directoryProperty()
 
     @TaskAction
     void join() {
-        Path lib = libsDir.get().asFile.toPath()
-        Path link = new File(build.get().asFile, "lib").toPath()
-        try {
-            // This takes up more space than I would like, but Windows doesn't allow symbolic links without superuser privliges
-            Files.walk(lib).forEach(file -> {
-                Path fileName = lib.relativize(file)
-                Path dest = link.resolve(fileName)
-                println fileName.toString() + ": " + file.toString() + " to " + dest.toString()
-                if (!Files.exists(dest)) {
-                    try {
-                        Files.copy(file, dest)
-                    }
-                    catch (IOException e)
-                    {
-                        throw new RuntimeException("Could not link " + file.toString() + " to " + dest.toString(), e)
-                    }
-                }
-            })
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException("Could not link " + lib.toString() + " to " + link.toString(), e)
-        }
-
-
         if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-            Runtime.getRuntime()
-                    .exec("REG ADD HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts /v universalmusic /d \""
-                            + inputFile.get().asFile.getAbsolutePath() + "\" ")
+            Process p = Runtime.getRuntime()
+                    .exec("REG DELETE HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\universalmusic /f ")
+            p.waitFor()
+            p = Runtime.getRuntime()
+                    .exec("REG ADD HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\universalmusic /ve /d \""
+                            + inputFile.get().asFile.getAbsolutePath() + "\" /f ")
+            p.waitFor()
         }
         else if (Os.isFamily(Os.FAMILY_MAC)) {
             Files.copy(inputFile.get().asFile.toPath(), Paths.get(System.getProperty("user.home"), "Library/Application Support/Mozilla/NativeMessagingHosts", inputFile.get().asFile.getName()))
@@ -122,7 +101,6 @@ abstract class InstallAddon extends DefaultTask {
 
 TaskProvider<InstallAddon> installAddonP = tasks.register("installAddon", InstallAddon) {
     inputFile = buildManifestP.get().outputFile
-    libsDir = jar.destinationDirectory
 }
 
 installAddon.dependsOn(buildManifest)
