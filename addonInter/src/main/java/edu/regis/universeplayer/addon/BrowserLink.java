@@ -5,21 +5,17 @@
 package edu.regis.universeplayer.addon;
 
 import com.google.gson.*;
+import edu.regis.universeplayer.browserCommands.MessageRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * The browser link serves as a communication between this process and the
@@ -29,342 +25,98 @@ import java.util.concurrent.TimeoutException;
  * @author William Hubbard
  * @version 0.1
  */
-public class BrowserLink implements Runnable
+public class BrowserLink extends MessageRunner
 {
-    private static Logger logger = LoggerFactory.getLogger(BrowserLink.class);
+    private static final Logger logger = LoggerFactory.getLogger(BrowserLink.class);
     public static final Gson gson = new Gson();
     
-    private BufferedInputStream browserIn;
-    private BufferedOutputStream browserOut;
-    
-    private final Object readLock = new Object();
-    
     /**
-     * This queue serves as a cache for objects we need to send.
+     * Creates a message runner.
      */
-    private final LinkedList<MessagePacket> sendQueue = new LinkedList<>();
-    /**
-     * This queue serves as a cache for objects that are waiting for a response.
-     */
-    private final LinkedList<MessagePacket> sentQueue = new LinkedList<>();
-    
-    private boolean running;
+    public BrowserLink()
+    {
+        super(System.in, System.out);
+    }
     
     @Override
-    public void run()
+    public byte[] serializeObject(Object message)
     {
-        MessagePacket packet;
-        this.running = true;
-        try
-        {
-            browserIn = new BufferedInputStream(System.in);
-            browserOut = new BufferedOutputStream(System.out);
-            
-            while (this.running)
-            {
-                /*
-                 * Sends all messages
-                 */
-                synchronized (this.sendQueue)
-                {
-                    packet = this.sendQueue.poll();
-                }
-                if (packet != null)
-                {
-                    try
-                    {
-                        logger.debug("Writing message {} {}", packet.message[0], packet.message[1]);
-                        this.browserOut.write(packet.message[0]);
-                        this.browserOut.write(packet.message[1]);
-                        this.browserOut.flush();
-                        
-                        synchronized (this.sentQueue)
-                        {
-                            this.sentQueue.add(packet);
-                        }
-                    }
-                    catch (IOException e)
-                    {
-                        logger.error("Could not send message " + new String(packet.message[1], StandardCharsets.UTF_8), e);
-                    }
-                }
-                
-                try
-                {
-                    packet = null;
-                    synchronized (this.sentQueue)
-                    {
-                        if (this.sentQueue.size() > 0)
-                        {
-                            packet = this.sentQueue.poll();
-                        }
-                    }
-                    if (packet != null)
-                    {
-                        if (this.browserIn.available() > 0)
-                        {
-                            /*
-                             * Wait for a response from the browser.
-                             */
-                            byte[][] returnMessage = this.readMessage();
-                            if (returnMessage == null)
-                            {
-                                logger.info("Browser connection closed.");
-                                this.running = false;
-                            }
-                            else
-                            {
-                                logger.debug("Reading message {} {}", returnMessage[0], returnMessage[1]);
-                                packet.returnMessage = returnMessage;
-                                synchronized (this.readLock)
-                                {
-                                    logger.trace("Received message, notifying futures.");
-                                    this.readLock.notifyAll();
-                                }
-                            }
-                        }
-                        else
-                        {
-                            synchronized (this.sentQueue)
-                            {
-                                this.sentQueue.addFirst(packet);
-                            }
-                            logger.trace("There are no new messages");
-                        }
-                    }
-                }
-                catch (IOException e)
-                {
-                    logger.error("Could not retrieve message", e);
-                }
-            }
-        }
-        finally
-        {
-            /*
-             * Release locks
-             */
-            synchronized (this.sendQueue)
-            {
-                while (this.sendQueue.size() > 0)
-                {
-                    packet = this.sendQueue.poll();
-                    packet.returnMessage = null;
-                }
-            }
-            synchronized (this.readLock)
-            {
-                this.readLock.notifyAll();
-            }
-            try
-            {
-                browserIn.close();
-            }
-            catch (IOException e1)
-            {
-                logger.error("Could not close browser input", e1);
-            }
-            finally
-            {
-                try
-                {
-                    browserOut.close();
-                }
-                catch (IOException e1)
-                {
-                    logger.error("Could not close browser output", e1);
-                }
-            }
-        }
+        String val = gson.toJson(message);
+        return val.getBytes(StandardCharsets.UTF_8);
     }
     
-    /**
-     * Reads a message from the browser input.
-     *
-     * @return - A new message packet from the browser, or null if it has been closed.
-     * @throws IOException - Should a read error occur.
-     */
-    private byte[][] readMessage() throws IOException
+    @Override
+    public Object deserializeObject(byte[] message) throws IOException
     {
-        ByteBuffer headerReader;
-        int rawLength, messageLength;
-        byte[] header = new byte[4];
-        byte[] message;
+        JsonElement val = gson.fromJson(new String(message, StandardCharsets.UTF_8), JsonElement.class);
+        return getMessage(val);
+    }
+    
+    @Override
+    public void writeMessage(OutputStream out, int messageNum, byte[] message) throws IOException
+    {
+        String messageString;
+        JsonObject sendOb = new JsonObject();
+        sendOb.add("messageNum", new JsonPrimitive(messageNum));
+        sendOb.add("message", gson.fromJson(new String(message, StandardCharsets.UTF_8), JsonElement.class));
+        messageString = gson.toJson(sendOb);
+        message = messageString.getBytes(StandardCharsets.UTF_8);
         
-        rawLength = browserIn.read(header);
-        
+        ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+        lengthBuffer.order(ByteOrder.nativeOrder());
+        logger.debug("Writing message {} {}", messageNum, messageString);
         /*
-         * A value of 0 or -1 indicates that there are no more messages, and
-         * that the channel has been closed.
+         * Writes the message length
          */
-        if (rawLength <= 0)
+        lengthBuffer.clear();
+        lengthBuffer.putInt(message.length);
+        out.write(lengthBuffer.array());
+        /*
+         * Writes the message
+         */
+        out.write(message);
+        out.flush();
+    }
+    
+    @Override
+    public byte[][] readMessage(InputStream in) throws IOException
+    {
+        int messageLength;
+        int messageNum;
+        int readLength;
+        byte[] message;
+        JsonObject messageJson;
+        ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+        lengthBuffer.order(ByteOrder.nativeOrder());
+        lengthBuffer.clear();
+        readLength = in.read(lengthBuffer.array());
+        if (readLength == 0)
         {
-            logger.info("The browser channel has been closed.");
+            logger.debug("Input stream closed, no more messages.");
             return null;
         }
-        
-        headerReader = ByteBuffer.wrap(header, 0, rawLength);
-        /*
-         * The browser outputs in whatever the native endian order,
-         * which may not be what Java does.
-         */
-        headerReader.order(ByteOrder.nativeOrder());
-        messageLength = headerReader.getInt();
-        logger.debug("Receiving message of {} length", messageLength);
+        messageLength = lengthBuffer.getInt();
         message = new byte[messageLength];
-        browserIn.read(message);
-        logger.debug("Unpacking message {} (length {})", new String(message, StandardCharsets.UTF_8), messageLength);
-        return new byte[][] {header, message};
-    }
-    
-    /**
-     * Sends an object to the browser.
-     *
-     * @param message - The object to send.
-     * @return A future for the response from the browser.
-     */
-    public Future<Object> sendObject(Object message)
-    {
-        String messageJson;
-        byte[] messageData;
-        ByteBuffer header;
-        byte[][] packet;
-        Future<Object> future;
-        MessagePacket packetEntry;
         
-        logger.debug("Sending message {}", message);
-        
-        messageJson = gson.toJson(message);
-        messageData = messageJson.getBytes(StandardCharsets.UTF_8);
-        header = ByteBuffer.allocate(4);
-        /*
-         * The browser outputs in whatever the native endian order is,
-         * which may not be what Java does.
-         */
-        header.order(ByteOrder.nativeOrder());
-        header.putInt(messageData.length);
-        
-        packetEntry = new MessagePacket(new byte[][] {header.array(), messageData});
-        
-        future = new Future<>()
+        readLength = in.read(message);
+        if (readLength < message.length)
         {
-            private boolean canceled = false;
-            
-            @Override
-            public boolean cancel(boolean mayInterruptIfRunning)
-            {
-                synchronized (sendQueue)
-                {
-                    if (sendQueue.remove(packetEntry))
-                    {
-                        canceled = true;
-                        if (mayInterruptIfRunning)
-                        {
-                            logger.trace("Canceling future, notifying self futures.");
-                            synchronized (readLock)
-                            {
-                                readLock.notifyAll();
-                            }
-                        }
-                        else
-                        {
-                            logger.trace("Canceling future.");
-                        }
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                }
-            }
-            
-            @Override
-            public boolean isCancelled()
-            {
-                return this.canceled;
-            }
-            
-            @Override
-            public boolean isDone()
-            {
-                return packetEntry.returnMessage != null;
-            }
-            
-            @Override
-            public Object get() throws InterruptedException, ExecutionException
-            {
-                logger.trace("Future waiting for message");
-                synchronized (readLock)
-                {
-                    while (!this.canceled && packetEntry.returnMessage == null)
-                    {
-                        readLock.wait();
-                    }
-                }
-                if (packetEntry.returnMessage == null)
-                {
-                    throw new InterruptedException();
-                }
-                logger.trace("Future has received message");
-                try
-                {
-                    return getMessage(packetEntry.returnMessage[1]);
-                }
-                catch (IOException e)
-                {
-                    throw new ExecutionException(e);
-                }
-            }
-            
-            @Override
-            public Object get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
-            {
-                logger.trace("Future waiting for message");
-                synchronized (readLock)
-                {
-                    while (!this.canceled && packetEntry.returnMessage == null)
-                    {
-                        readLock.wait(unit.toMillis(timeout));
-                    }
-                }
-                if (packetEntry.returnMessage == null)
-                {
-                    throw new InterruptedException();
-                }
-                logger.trace("Future has received message");
-                try
-                {
-                    return getMessage(packetEntry.returnMessage[1]);
-                }
-                catch (IOException e)
-                {
-                    throw new ExecutionException(e);
-                }
-            }
-        };
-        
-        packetEntry.returnValue = future;
-        
-        synchronized (this.sendQueue)
-        {
-            sendQueue.add(packetEntry);
+            logger.warn("Message shorter than reported (expected {} bytes, got {} bytes)", message.length, readLength);
         }
+        messageJson = gson.fromJson(new String(message, StandardCharsets.UTF_8), JsonObject.class);
+        messageNum = messageJson.get("messageNum").getAsInt();
+        message = gson.toJson(messageJson.get("message")).getBytes(StandardCharsets.UTF_8);
         
-        return future;
-    }
-    
-    /**
-     * Queries for the next message from the browser.
-     *
-     * @return The received message
-     * @throws IOException - If there is an error when reading the next object,
-     *                     or if the browser connection is closed.
-     */
-    private Object getMessage(byte[] messageData) throws IOException
-    {
-        JsonElement message = gson.fromJson(new String(messageData, StandardCharsets.UTF_8), JsonElement.class);
-        return getMessage(message);
+        lengthBuffer.order(ByteOrder.BIG_ENDIAN);
+        /*
+         * Wipe out the buffer
+         */
+        lengthBuffer.clear();
+        lengthBuffer.put(new byte[4]);
+        lengthBuffer.clear();
+        lengthBuffer.putInt(messageNum);
+        logger.debug("Reading message {}", messageNum);
+        return new byte[][] {lengthBuffer.array(), message};
     }
     
     /**
@@ -492,26 +244,5 @@ public class BrowserLink implements Runnable
             returnValue[i] = getMessage(message.get(i));
         }
         return returnValue;
-    }
-    
-    /**
-     * This represents a sent message in storage.
-     */
-    private class MessagePacket
-    {
-        public final byte[][] message;
-        public byte[][] returnMessage;
-        public Future<Object> returnValue;
-        
-        public MessagePacket(byte[][] message)
-        {
-            this(message, null);
-        }
-        
-        public MessagePacket(byte[][] message, Future<Object> returnValue)
-        {
-            this.message = message;
-            this.returnValue = returnValue;
-        }
     }
 }

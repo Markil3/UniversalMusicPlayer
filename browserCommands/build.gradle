@@ -3,8 +3,7 @@
  */
 
 plugins {
-    id 'java'
-    id 'application'
+    id 'java-library'
 }
 
 // In this section you declare where to find the dependencies of your project
@@ -20,12 +19,6 @@ dependencies {
     implementation 'org.apache.logging.log4j:log4j-core:2.13.3'
     implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.13.3'
 
-    implementation 'com.google.code.gson:gson:2.8.7'
-    implementation 'com.googlecode.soundlibs:jlayer:1.0.1.4'
-    implementation 'com.mpatric:mp3agic:0.9.1'
-    implementation project(":libwave")
-    implementation project(":browserCommands")
-
     // Declare the dependency for your favourite test framework you want to use in your tests.
     // TestNG is also supported by the Gradle Test task. Just change the
     // testCompile dependency to testCompile 'org.testng:testng:6.8.1' and add
@@ -35,15 +28,3 @@ dependencies {
 
 sourceCompatibility = JavaVersion.VERSION_16
 targetCompatibility = JavaVersion.VERSION_16
-
-// Define the main class for the application
-mainClassName = defaultPackage + '.player.Interface'
-//mainClassName = defaultPackage + '.localPlayer.Player'
-
-run {
-    systemProperty "java.library.path", file("${project(":player").buildDir}/lib/main/debug").absolutePath
-}
-
-compileJava.dependsOn rootProject.bundleAddOn
-compileJava.dependsOn ':player:linkDebug'
-compileJava.dependsOn ':addonInter:installAddon'
