@@ -27,15 +27,15 @@ import java.util.HashMap;
  */
 public class BrowserLink extends MessageRunner
 {
-    private static final Logger logger = LoggerFactory.getLogger(BrowserLink.class);
+//    private static final Logger logger = LoggerFactory.getLogger(BrowserLink.class);
     public static final Gson gson = new Gson();
     
     /**
      * Creates a message runner.
      */
-    public BrowserLink()
+    public BrowserLink(String name)
     {
-        super(System.in, System.out);
+        super(name, System.in, System.out);
     }
     
     @Override
@@ -64,7 +64,7 @@ public class BrowserLink extends MessageRunner
         
         ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
         lengthBuffer.order(ByteOrder.nativeOrder());
-        logger.debug("Writing message {} {}", messageNum, messageString);
+        getLogger().debug("Writing message {} {}", messageNum, messageString);
         /*
          * Writes the message length
          */
@@ -92,7 +92,7 @@ public class BrowserLink extends MessageRunner
         readLength = in.read(lengthBuffer.array());
         if (readLength == 0)
         {
-            logger.debug("Input stream closed, no more messages.");
+            getLogger().debug("Input stream closed, no more messages.");
             return null;
         }
         messageLength = lengthBuffer.getInt();
@@ -101,7 +101,7 @@ public class BrowserLink extends MessageRunner
         readLength = in.read(message);
         if (readLength < message.length)
         {
-            logger.warn("Message shorter than reported (expected {} bytes, got {} bytes)", message.length, readLength);
+            getLogger().warn("Message shorter than reported (expected {} bytes, got {} bytes)", message.length, readLength);
         }
         messageJson = gson.fromJson(new String(message, StandardCharsets.UTF_8), JsonObject.class);
         messageNum = messageJson.get("messageNum").getAsInt();
@@ -115,7 +115,7 @@ public class BrowserLink extends MessageRunner
         lengthBuffer.put(new byte[4]);
         lengthBuffer.clear();
         lengthBuffer.putInt(messageNum);
-        logger.debug("Reading message {}", messageNum);
+        getLogger().debug("Reading message {}", messageNum);
         return new byte[][] {lengthBuffer.array(), message};
     }
     
@@ -200,7 +200,7 @@ public class BrowserLink extends MessageRunner
             }
             catch (ClassNotFoundException | ClassCastException e)
             {
-                logger.error("Illegal class type " + message.get("type"), e);
+                getLogger().error("Illegal class type " + message.get("type"), e);
             }
         }
         
@@ -221,7 +221,7 @@ public class BrowserLink extends MessageRunner
                 }
                 catch (IOException e)
                 {
-                    logger.error("Could not parse message entry " + entry.getKey() + " (" + entry.getValue() + ")", e);
+                    getLogger().error("Could not parse message entry " + entry.getKey() + " (" + entry.getValue() + ")", e);
                 }
             });
             return type;

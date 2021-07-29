@@ -22,8 +22,9 @@ import java.util.concurrent.TimeoutException;
  */
 public abstract class MessageRunner implements Runnable, MessageSerializer
 {
-    private static final Logger logger = LoggerFactory.getLogger(MessageRunner.class);
+    private final Logger logger;
     
+    private final String name;
     private final InputStream input;
     private final OutputStream output;
     private final Object readLock = new Object();
@@ -41,13 +42,22 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
     /**
      * Creates a message runner.
      *
+     * @param name - The name of the runner. This is used in logging.
      * @param input  - The input from our external source.
      * @param output - The output to the external source.
      */
-    public MessageRunner(InputStream input, OutputStream output)
+    public MessageRunner(String name, InputStream input, OutputStream output)
     {
+        this.name = name;
+        this.logger = LoggerFactory.getLogger(name);
         this.input = input;
         this.output = output;
+    }
+    
+    @Override
+    public Logger getLogger()
+    {
+        return logger;
     }
     
     @Override
@@ -91,7 +101,7 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
                     }
                     catch (IOException e)
                     {
-                        logger.error("Could not send message " + new String(packet.message, StandardCharsets.UTF_8), e);
+                        logger.error("Could not send message " + this.messagesSent + " " + new String(packet.message, StandardCharsets.UTF_8), e);
                     }
                 }
                 
@@ -144,6 +154,10 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
                     logger.error("Could not retrieve message", e);
                 }
             }
+        }
+        catch (Throwable e)
+        {
+            logger.error(this.getClass().getName() + " Error", e);
         }
         finally
         {

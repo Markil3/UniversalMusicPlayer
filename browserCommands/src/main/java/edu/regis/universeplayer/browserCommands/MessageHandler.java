@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -22,7 +23,9 @@ import java.util.concurrent.Future;
  */
 public class MessageHandler implements Runnable, MessageSerializer
 {
-    private static final Logger logger = LoggerFactory.getLogger(MessageHandler.class);
+    private final Logger logger;
+    
+    private final String name;
     
     private final InputStream input;
     private final OutputStream output;
@@ -34,14 +37,23 @@ public class MessageHandler implements Runnable, MessageSerializer
     /**
      * Creates a message handler.
      *
+     * @param name - The name of the handler. This is used in logging.
      * @param input  - The input from our external source.
      * @param output - The output to the external source.
      */
-    public MessageHandler(InputStream input, OutputStream output)
+    public MessageHandler(String name, InputStream input, OutputStream output)
     {
+        this.name = name;
+        this.logger = LoggerFactory.getLogger(name);
         this.input = input;
         this.output = output;
         this.executor = Executors.newCachedThreadPool();
+    }
+    
+    @Override
+    public Logger getLogger()
+    {
+        return logger;
     }
     
     @Override
@@ -84,6 +96,7 @@ public class MessageHandler implements Runnable, MessageSerializer
                             messageResponse = this.triggerListeners(messageOb);
                             synchronized (this.messageResponses)
                             {
+                                numBuffer.clear();
                                 this.messageResponses.put(numBuffer.getInt(), messageResponse);
                             }
                         }
@@ -108,7 +121,7 @@ public class MessageHandler implements Runnable, MessageSerializer
                                 if (responses.getValue().isDone())
                                 {
                                     toRemove.add(responses.getKey());
-                                    messageByte = serializeObject(responses.getValue());
+                                    messageByte = serializeObject(responses.getValue().get());
                                     writeMessage(browserOut, responses.getKey(), messageByte);
                                 }
                             }
@@ -122,6 +135,10 @@ public class MessageHandler implements Runnable, MessageSerializer
                     }
                 }
             }
+        }
+        catch (Throwable e)
+        {
+            logger.error(this.getClass().getName() + " Error", e);
         }
         finally
         {
@@ -255,6 +272,6 @@ public class MessageHandler implements Runnable, MessageSerializer
          *                       have generated return values.
          * @return The value to be returned to the remote.
          */
-        Object onMessage(Object providedValue, Object previousReturn);
+        Object onMessage(Object providedValue, Object previousReturn) throws IOException, ExecutionException, InterruptedException;
     }
 }

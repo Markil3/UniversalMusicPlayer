@@ -9,7 +9,7 @@
         </Console>
         <File name="File" fileName="interface.log" append="false">
             <PatternLayout>
-                <Pattern>%d{HH:mm:ss.SSS} - %45c:%-4L - %-5level - %msg%n</Pattern>
+                <Pattern>%d{HH:mm:ss.SSS} - %c.%M(%F:%L) - %-5level - %msg%n</Pattern>
             </PatternLayout>
         </File>
     </Appenders>
@@ -17,8 +17,5 @@
         <Root level="debug">
             <AppenderRef ref="File"/>
         </Root>
-        <Logger name="edu.regis.universeplayer.browser.Browser" level="info">
-            <AppenderRef ref="Console"/>
-        </Logger>
     </Loggers>
 </Configuration>

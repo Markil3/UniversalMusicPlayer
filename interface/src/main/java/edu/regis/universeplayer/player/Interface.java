@@ -11,12 +11,16 @@ import java.awt.event.ComponentListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedList;
+import java.util.concurrent.Future;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 
+import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browser.Browser;
 import edu.regis.universeplayer.browser.MessageManager;
 import edu.regis.universeplayer.data.CollectionType;
@@ -54,43 +58,65 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     /**
      * A link to the browser.
      */
-    private MessageManager browser;
+    private ArrayList<Player> players = new ArrayList<>();
+    private int currentPlayer = -1;
     
     public static void main(String[] args)
     {
-        /*
-         * Add this just in case of a crash or something. It won't work if the
-         * program is forcible terminated by the OS, but it could be helpful
-         * otherwise.
-         */
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            Browser.closeBrowser();
-        }));
-        logger.info("Starting application");
-        Interface inter = new Interface();
+        Thread browserThread;
+        Interface inter = null;
+        Browser browser;
         try
         {
-            inter.browser = new MessageManager();
+            /*
+             * Add this just in case of a crash or something. It won't work if the
+             * program is forcible terminated by the OS, but it could be helpful
+             * otherwise.
+             */
+            logger.info("Starting application");
+            inter = new Interface();
+            inter.pack();
+            inter.setVisible(true);
+            
+            try
+            {
+                inter.players.add(browser = Browser.createBrowser());
+                browserThread = new Thread(browser);
+                browserThread.start();
+                Runtime.getRuntime().addShutdownHook(new Thread(browser::close));
+    
+                LinkedList<Future<Object>> pingRequests = new LinkedList<>();
+                for (int i = 0; i < 20; i++)
+                {
+                    logger.info("Sending ping");
+                    pingRequests.add(browser.sendObject("ping"));
+                }
+                
+                LinkedList<Future<Object>> toRemove = new LinkedList<>();
+                while (pingRequests.size() > 0)
+                {
+                    for (Future<Object> future: pingRequests)
+                    {
+                        if (future.isDone())
+                        {
+                            logger.info("Receiving {}", future.get());
+                            toRemove.add(future);
+                        }
+                    }
+                    pingRequests.removeAll(toRemove);
+                    toRemove.clear();
+                }
+            }
+            catch (IOException e)
+            {
+                logger.error("Could not open browser background", e);
+                JOptionPane.showMessageDialog(inter, e, "Could not open browser background", JOptionPane.ERROR_MESSAGE);
+            }
         }
-        catch (IOException e)
-        {
-            logger.error("Could not open browser communication", e);
-            JOptionPane.showMessageDialog(null, e, "Could not open browser communication", JOptionPane.ERROR_MESSAGE);
-        }
-        inter.pack();
-        inter.setVisible(true);
-        
-        /*
-         * Launch the browser in the background.
-         */
-        try
-        {
-            Browser.launchBrowser();
-        }
-        catch (IOException e)
+        catch (Throwable e)
         {
             logger.error("Could not open browser background", e);
-            JOptionPane.showMessageDialog(inter, e, "Could not open browser background", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(inter != null && inter.isVisible() ? inter : null, e, "Error!", JOptionPane.ERROR_MESSAGE);
         }
     }
     
@@ -191,18 +217,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     @Override
     public void windowClosing(WindowEvent windowEvent)
     {
-        Browser.closeBrowser();
-        if (this.browser != null)
-        {
-            try
-            {
-                this.browser.close();
-            }
-            catch (IOException e)
-            {
-                logger.error("Could not close browser", e);
-            }
-        }
+        this.players.forEach(Player::close);
     }
     
     @Override
@@ -243,29 +258,31 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     @Override
     public void onCommand(PlaybackCommand command, Object data)
     {
-        Object message = null;
-        if (this.browser != null)
+        Player player;
+        if (this.currentPlayer >= 0 && this.currentPlayer < this.players.size())
         {
-            synchronized (this.browser)
+            player = this.players.get(this.currentPlayer);
+        }
+        else
+        {
+            throw new NullPointerException("No player available");
+        }
+        switch (command)
+        {
+        case PLAY -> {
+            if (data instanceof Song)
             {
-                try
-                {
-                    this.browser.ping();
-                    message = this.browser.getMessage();
-                }
-                catch (IOException e)
-                {
-                    logger.error("Could not send message to browser", e);
-                    JOptionPane.showMessageDialog(this, e, "Could not send message to browser", JOptionPane.ERROR_MESSAGE);
-                }
+                player.loadSong((Song) data);
             }
         }
-        if (message != null)
-        {
-            if ("ping".equals(message))
-            {
-                JOptionPane.showMessageDialog(this, "Ping received!");
-            }
+        case PAUSE -> {
+        }
+        case NEXT -> {
+        }
+        case PREVIOUS -> {
+        }
+        case SEEK -> {
+        }
         }
     }
 }

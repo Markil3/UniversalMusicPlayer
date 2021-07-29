@@ -5,14 +5,13 @@
 package edu.regis.universeplayer.browserCommands;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
 
 public interface MessageSerializer
 {
-    Logger logger = LoggerFactory.getLogger(MessageSerializer.class);
+    Logger getLogger();
     
     /**
      * Converts an object into a form that can be sent.
@@ -63,7 +62,7 @@ public interface MessageSerializer
     default void writeMessage(OutputStream out, int messageNum, byte[] message) throws IOException
     {
         ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-        logger.debug("Writing message {} {}", messageNum, message);
+        getLogger().trace("Writing message {} {}", messageNum, message);
         /*
          * Writes the message number.
          */
@@ -110,7 +109,7 @@ public interface MessageSerializer
         readLength = in.read(messageNum);
         if (readLength == 0)
         {
-            logger.debug("Input stream closed, no more messages.");
+            getLogger().debug("Input stream closed, no more messages.");
             return null;
         }
         /*
@@ -120,7 +119,7 @@ public interface MessageSerializer
         readLength = in.read(lengthBuffer.array());
         if (readLength == 0)
         {
-            logger.error("Malformed message, could not get message length.");
+            getLogger().error("Malformed message, could not get message length.");
             return null;
         }
         message = new byte[lengthBuffer.getInt()];
@@ -130,9 +129,9 @@ public interface MessageSerializer
         readLength = in.read(message);
         if (readLength < message.length)
         {
-            logger.warn("Message shorter than reported (expected {} bytes, got {} bytes)", message.length, readLength);
+            getLogger().warn("Message shorter than reported (expected {} bytes, got {} bytes)", message.length, readLength);
         }
-        logger.debug("Reading message");
+        getLogger().trace("Reading message");
         return new byte[][] {messageNum, message};
     }
 }
