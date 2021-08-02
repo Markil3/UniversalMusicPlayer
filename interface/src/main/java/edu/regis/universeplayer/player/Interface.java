@@ -10,6 +10,7 @@ import edu.regis.universeplayer.data.CollectionType;
 import edu.regis.universeplayer.data.Song;
 import edu.regis.universeplayer.data.SongProvider;
 import edu.regis.universeplayer.data.UpdateListener;
+import net.harawata.appdirs.AppDirsFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +20,7 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -34,6 +36,9 @@ import java.util.concurrent.Future;
 public class Interface extends JFrame implements SongDisplayListener, ComponentListener, WindowListener, PlaybackCommandListener, UpdateListener
 {
     private static final Logger logger = LoggerFactory.getLogger(Interface.class);
+    
+    private static File dataDir;
+    private static File configDir;
     
     /**
      * A reference to the panel containing links to different collection views.
@@ -121,6 +126,48 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             logger.error("Could not open browser background", e);
             JOptionPane.showMessageDialog(inter != null && inter.isVisible() ? inter : null, e, "Error!", JOptionPane.ERROR_MESSAGE);
         }
+    }
+    
+    /**
+     * Obtains the data storage directory for the application, creating it if
+     * needed.
+     * @return The data storage directory.
+     */
+    public static File getDataDir()
+    {
+        if (dataDir == null)
+        {
+            dataDir = new File(AppDirsFactory.getInstance().getUserDataDir("universalmusic", null, null, true));
+            if (!dataDir.exists())
+            {
+                if (!dataDir.mkdir())
+                {
+                    logger.error("Could not create data directory {}", dataDir);
+                }
+            }
+        }
+        return dataDir;
+    }
+    
+    /**
+     * Obtains the configuration directory for the application, creating it if
+     * needed.
+     * @return The configuration directory.
+     */
+    public static File getConfigDir()
+    {
+        if (configDir == null)
+        {
+            configDir = new File(AppDirsFactory.getInstance().getUserConfigDir("universalmusic", null, null, true));
+            if (!configDir.exists())
+            {
+                if (!configDir.mkdir())
+                {
+                    logger.error("Could not create configuration directory {}", configDir);
+                }
+            }
+        }
+        return configDir;
     }
     
     /**

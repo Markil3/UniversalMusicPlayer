@@ -17,7 +17,7 @@
         <Root level="info">
             <AppenderRef ref="File"/>
         </Root>
-        <Logger name="edu.regis.universeplayer.player.Interface" level="debug">
+        <Logger name="edu.regis.universeplayer.data.LocalSongProvider" level="debug">
             <AppenderRef ref="Console"/>
         </Logger>
     </Loggers>

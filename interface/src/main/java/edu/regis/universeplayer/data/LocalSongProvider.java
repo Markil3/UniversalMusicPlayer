@@ -4,15 +4,15 @@
 
 package edu.regis.universeplayer.data;
 
+import edu.regis.universeplayer.player.Interface;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.*;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -24,6 +24,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     private static final HashSet<String> codecs = new HashSet<>();
     
     private final File source;
+    private Connection db;
     
     private final HashSet<LocalSong> songs = new HashSet<>();
     private final HashMap<String, Album> albums = new HashMap<>();
@@ -151,12 +152,11 @@ public class LocalSongProvider implements SongProvider<LocalSong>
         return codecs;
     }
     
-    private class SongScanner implements Runnable
+    private class SongScanner extends RecursiveAction
     {
-        private static final int serviceThreads = Math.max(Runtime.getRuntime().availableProcessors() - 2, 1);
-        private static final ExecutorService service = Executors.newFixedThreadPool(serviceThreads);
+        private static final ForkJoinPool service = new ForkJoinPool();
         private static String currentFolder;
-    
+        
         private final File file;
         
         SongScanner(File folder)
@@ -165,7 +165,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
         }
         
         @Override
-        public void run()
+        public void compute()
         {
             Process process;
             String line;
@@ -191,12 +191,11 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                 if (file.isDirectory())
                 {
                     totalUpdate--;
-                    for (File subFile : Objects.requireNonNull(file.listFiles()))
-                    {
-                        totalUpdate++;
-                        triggerUpdateListeners();
-                        service.submit(new SongScanner(subFile));
-                    }
+                    List<SongScanner> tasks = Arrays.stream(Objects.requireNonNullElse(file.listFiles(), new File[0]))
+                            .map(SongScanner::new).collect(Collectors.toList());
+                    totalUpdate += tasks.size();
+                    triggerUpdateListeners();
+                    invokeAll(tasks);
                 }
                 else if (file.getName().lastIndexOf(".") < file.getName().length() - 1)
                 {
@@ -421,7 +420,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                 }
                                 
                                 logger.debug("Caching song {} ({})", song, song.file);
-    
+                                
                                 updatedSongs++;
                                 triggerUpdateListeners();
                                 synchronized (songs)
@@ -471,37 +470,207 @@ public class LocalSongProvider implements SongProvider<LocalSong>
         }
     }
     
+    private Connection getDb()
+    {
+        SQLWarning warning;
+        try
+        {
+            if (this.db == null || this.db.isClosed())
+            {
+                Class.forName("org.sqlite.JDBC");
+                this.db = DriverManager.getConnection("jdbc:sqlite:" + new File(Interface.getDataDir().getAbsolutePath(), "universalmusic.db").getAbsolutePath());
+                this.db.setAutoCommit(false);
+            }
+            warning = this.db.getWarnings();
+            while (warning != null)
+            {
+                logger.warn("SQL Warning: ", warning);
+                warning = warning.getNextWarning();
+            }
+        }
+        catch (SQLException | ClassNotFoundException e)
+        {
+            logger.error("Could not store caching DIR.");
+        }
+        return this.db;
+    }
+    
     public LocalSongProvider(File source)
     {
+        Connection dbL = null;
         this.source = source;
         if (this.source == null || !this.source.isDirectory())
         {
             throw new IllegalArgumentException("File source must be existing directory");
         }
         
-        // TODO - Add some sort of caching system
-        totalUpdate = 1;
+        this.getDb();
+        SongScanner.service.submit(() -> {
+            Statement state;
+            ResultSet result;
+            Album album;
+            LocalSong song;
+            
+            try
+            {
+                logger.debug("Querying database.");
+                state = this.getDb().createStatement();
+                result = state.executeQuery("SELECT * FROM LOCAL_ALBUMS;");
+                while (result.next())
+                {
+                    album = new Album();
+                    album.name = result.getString("album");
+                    album.artists = Optional.ofNullable(result.getString("artists")).map(s -> s.split(";")).orElse(new String[0]);
+                    album.year = result.getInt("year");
+                    album.genres = Optional.ofNullable(result.getString("genres")).map(s -> s.split(";")).orElse(new String[0]);
+                    album.totalTracks = result.getInt("tracks");
+                    album.totalDiscs = result.getInt("discs");
+                    albums.put(album.name, album);
+                }
+                result = state.executeQuery("SELECT * FROM LOCAL_SONGS;");
+                while (result.next())
+                {
+                    song = new LocalSong();
+                    song.file = new File(result.getString("file"));
+                    song.codec = result.getString("codec");
+                    song.type = result.getString("type");
+                    song.title = result.getString("title");
+                    song.artists = Optional.ofNullable(result.getString("artists")).map(s -> s.split(";")).orElse(new String[0]);
+                    song.trackNum = result.getInt("track");
+                    song.disc = result.getInt("disc");
+                    song.duration = result.getLong("duration");
+                    song.album = Optional.ofNullable(result.getString("album")).map(albums::get).orElse(null);
+                    songs.add(song);
+                }
+                result.close();
+                state.close();
+            }
+            catch (SQLException e)
+            {
+                logger.error("Could not query SQL database.", e);
+            }
+            if (songs.isEmpty())
+            {
+                logger.debug("No songs within database. Scanning...");
+                totalUpdate = 1;
+                updateSongs();
+            }
+            else
+            {
+                try
+                {
+                    this.getDb().commit();
+                    this.getDb().close();
+                    updatedSongs = 0;
+                    totalUpdate = 0;
+                    triggerUpdateListeners();
+                }
+                catch (SQLException e)
+                {
+                    logger.error("Could not close database.", e);
+                }
+            }
+        });
+    }
+    
+    /**
+     * Scans the local file system for song files.
+     */
+    private void updateSongs()
+    {
         SongScanner.service.submit(new SongScanner(source));
         
         /*
          * Resets the song scanner when ready.
          */
         SongScanner.service.submit(() -> {
+            Statement stat;
+            ResultSet tableResult;
             while (true)
             {
-                try
+                if (SongScanner.service.awaitQuiescence(60, TimeUnit.SECONDS))
                 {
-                    if (!SongScanner.service.awaitTermination(60, TimeUnit.SECONDS)) break;
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error in waiting for song scan.", e);
+                    break;
                 }
             }
             SongScanner.currentFolder = "";
             updatedSongs = 0;
             totalUpdate = 0;
             triggerUpdateListeners();
+            
+            /*
+             * Update the SQL database.
+             */
+            try
+            {
+                logger.debug("Updating local song database.");
+                stat = this.getDb().createStatement();
+                tableResult = stat.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_SONGS';");
+                logger.debug("Table result: {}", tableResult.getCursorName());
+                if (!tableResult.next())
+                {
+                    logger.debug("Creating song table.");
+                    /*
+                     * Create the table
+                     */
+                    stat.executeUpdate("CREATE TABLE LOCAL_SONGS" +
+                            "(FILE TEXT PRIMARY KEY NOT NULL," +
+                            "CODEC CHAR(5)," +
+                            "TYPE CHAR(5)," +
+                            "TITLE TEXT," +
+                            "ARTISTS TEXT," +
+                            "TRACK INTEGER," +
+                            "DISC INTEGER," +
+                            "DURATION BIGINT," +
+                            "ALBUM TEXT);");
+                }
+                else
+                {
+                    logger.debug("Clearing song table.");
+                    stat.executeUpdate("DELETE FROM LOCAL_SONGS;");
+                }
+                tableResult = stat.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_ALBUMS';");
+                if (!tableResult.next())
+                {
+                    logger.debug("Creating album table.");
+                    /*
+                     * Create the table
+                     */
+                    stat.executeUpdate("CREATE TABLE LOCAL_ALBUMS" +
+                            "(ALBUM TEXT PRIMARY KEY NOT NULL," +
+                            "ARTISTS TEXT," +
+                            "YEAR INTEGER," +
+                            "GENRES TEXT," +
+                            "TRACKS INTEGER," +
+                            "DISCS INTEGER);");
+                }
+                else
+                {
+                    logger.debug("Clearing album table.");
+                    stat.executeUpdate("DELETE FROM LOCAL_ALBUMS;");
+                }
+                
+                tableResult.close();
+                
+                for (Album album : this.albums.values())
+                {
+                    stat.executeUpdate("INSERT INTO LOCAL_ALBUMS (ALBUM,ARTISTS,YEAR,GENRES,TRACKS,DISCS) " +
+                            "VALUES ('" + album.name + "', '" + String.join(";", album.artists) + "', " + album.year + ", '" + String.join(";", album.genres) + "', " + album.totalTracks + ", " + album.totalDiscs + ");");
+                }
+                for (LocalSong song : this.songs)
+                {
+                    stat.executeUpdate("INSERT INTO LOCAL_SONGS (FILE,CODEC,TYPE,TITLE,ARTISTS,TRACK,DISC,DURATION,ALBUM) " +
+                            "VALUES ('" + song.file.getAbsolutePath() + "', '" + song.codec + "', '" + song.type + "', '" + song.title + "', '" + String.join(";", song.artists) + "', " + song.trackNum + ", " + song.disc + ", " + song.duration + ", '" + song.album.name + "');");
+                }
+                stat.close();
+                this.getDb().commit();
+                this.getDb().close();
+                logger.debug("Cache updated.");
+            }
+            catch (SQLException e)
+            {
+                logger.error("Error in saving SQLite database", e);
+            }
         });
     }
     
