@@ -26,7 +26,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     private final File source;
     private Connection db;
     
-    private final HashSet<LocalSong> songs = new HashSet<>();
+    private final HashMap<File, LocalSong> songs = new HashMap<>();
     private final HashMap<String, Album> albums = new HashMap<>();
     /**
      * A cache of all song artists.
@@ -152,6 +152,245 @@ public class LocalSongProvider implements SongProvider<LocalSong>
         return codecs;
     }
     
+    private Connection getDb()
+    {
+        SQLWarning warning;
+        try
+        {
+            if (this.db == null || this.db.isClosed())
+            {
+                Class.forName("org.sqlite.JDBC");
+                this.db = DriverManager.getConnection("jdbc:sqlite:" + new File(Interface.getDataDir().getAbsolutePath(), "universalmusic.db").getAbsolutePath());
+            }
+            warning = this.db.getWarnings();
+            while (warning != null)
+            {
+                logger.warn("SQL Warning: ", warning);
+                warning = warning.getNextWarning();
+            }
+            this.db.clearWarnings();
+        }
+        catch (SQLException | ClassNotFoundException e)
+        {
+            logger.error("Could not store caching DIR.");
+        }
+        return this.db;
+    }
+    
+    public LocalSongProvider(File source)
+    {
+        Connection dbL = null;
+        this.source = source;
+        if (this.source == null || !this.source.isDirectory())
+        {
+            throw new IllegalArgumentException("File source must be existing directory");
+        }
+        
+        this.getDb();
+        getSongCache();
+    }
+    
+    private void getSongCache()
+    {
+        SongScanner.service.submit(new SongQuery(true));
+    }
+    
+    /**
+     * Obtains all albums within the collection.
+     *
+     * @return A list of albums.
+     */
+    @Override
+    public Collection<Album> getAlbums()
+    {
+        return this.albums.values();
+    }
+    
+    /**
+     * Obtains all songs within the collection.
+     *
+     * @return A list of songs.
+     */
+    @Override
+    public Collection<LocalSong> getSongs()
+    {
+        synchronized (this.songs)
+        {
+            return Collections.unmodifiableCollection(this.songs.values());
+        }
+    }
+    
+    /**
+     * Obtains a list of all artists.
+     *
+     * @return All artists.
+     */
+    @Override
+    public Collection<String> getArtists()
+    {
+        return this.artists;
+    }
+    
+    /**
+     * Obtains a list of all album artists.
+     *
+     * @return All album artists.
+     */
+    @Override
+    public Collection<String> getAlbumArtists()
+    {
+        return this.albumArtists;
+    }
+    
+    /**
+     * Obtains a list of all genres.
+     *
+     * @return All genres.
+     */
+    @Override
+    public Collection<String> getGenres()
+    {
+        return this.genres;
+    }
+    
+    /**
+     * Obtains a list of all years that have albums.
+     *
+     * @return All years.
+     */
+    @Override
+    public Collection<Integer> getYears()
+    {
+        return this.years;
+    }
+    
+    /**
+     * Obtains all songs from an album.
+     *
+     * @param album - The album to obtain
+     * @return All songs from the requested album, or null if that album is not in the database.
+     */
+    @Override
+    public Collection<LocalSong> getSongsFromAlbum(Album album)
+    {
+        synchronized (this.songs)
+        {
+            return this.songs.values().stream().filter(song -> song.album.equals(album)).collect(Collectors.toUnmodifiableSet());
+        }
+    }
+    
+    /**
+     * Obtains all songs written by a given artist.
+     *
+     * @param artist - The artist to search for
+     * @return A list of all songs from the specified artist, or null if that artist is not in the
+     * database.
+     */
+    @Override
+    public Collection<LocalSong> getSongsFromArtist(String artist)
+    {
+        synchronized (this.songs)
+        {
+            return this.songs.values().stream().filter(song -> Arrays.asList(song.artists).contains(artist)).collect(Collectors.toUnmodifiableSet());
+        }
+    }
+    
+    /**
+     * Obtains an album by a specific name.
+     *
+     * @param name - The name to search for.
+     * @return - The first album that matches the given name, or null if that album name is not in
+     * the database.
+     */
+    @Override
+    public Album getAlbumByName(String name)
+    {
+        synchronized (this.albums)
+        {
+            return this.albums.get(name);
+        }
+    }
+    
+    /**
+     * Obtains all albums that were written by a certain artist.
+     *
+     * @param artist - The artist to search for.
+     * @return - The collection on matching albums.
+     */
+    @Override
+    public Collection<Album> getAlbumsFromArtist(String artist)
+    {
+        synchronized (this.albums)
+        {
+            return this.albums.values().stream().filter(album -> Arrays.asList(album.artists).contains(artist)).collect(Collectors.toUnmodifiableSet());
+        }
+    }
+    
+    /**
+     * Obtains all albums that match a certain genre
+     *
+     * @param genre - The genre to search for.
+     * @return - The collection on matching albums.
+     */
+    @Override
+    public Collection<Album> getAlbumsFromGenre(String genre)
+    {
+        synchronized (this.albums)
+        {
+            return this.albums.values().stream().filter(album -> Arrays.asList(album.genres).contains(genre)).collect(Collectors.toUnmodifiableSet());
+        }
+    }
+    
+    /**
+     * Obtains all albums that were released a certain year.
+     *
+     * @param year - The year to search for.
+     * @return - The collection on matching albums.
+     */
+    @Override
+    public Collection<Album> getAlbumsFromYear(int year)
+    {
+        synchronized (this.albums)
+        {
+            return this.albums.values().stream().filter(album -> album.year == year).collect(Collectors.toUnmodifiableSet());
+        }
+    }
+    
+    @Override
+    public int getUpdateProgress()
+    {
+        return this.updatedSongs;
+    }
+    
+    @Override
+    public int getTotalUpdateSongs()
+    {
+        return this.totalUpdate;
+    }
+    
+    @Override
+    public String getUpdateText()
+    {
+        return SongScanner.currentFolder;
+    }
+    
+    @Override
+    public void addUpdateListener(UpdateListener listener)
+    {
+        this.listeners.add(listener);
+    }
+    
+    @Override
+    public void removeUpdateListener(UpdateListener listener)
+    {
+        this.listeners.remove(listener);
+    }
+    
+    protected void triggerUpdateListeners()
+    {
+        this.listeners.forEach(listener -> listener.onUpdate(this.getUpdateProgress(), this.getTotalUpdateSongs(), this.getUpdateText()));
+    }
+    
     private class SongScanner extends RecursiveAction
     {
         private static final ForkJoinPool service = new ForkJoinPool();
@@ -183,8 +422,8 @@ public class LocalSongProvider implements SongProvider<LocalSong>
             Integer[] track = null;
             Integer[] disc = null;
             
-            LocalSong song;
-            Album album;
+            Statement state = null;
+            ResultSet result;
             
             try
             {
@@ -204,7 +443,26 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                     {
                         try
                         {
+                            state = getDb().createStatement();
+                            result = state.executeQuery("SELECT mod FROM local_songs WHERE file='" + this.file.getAbsolutePath() + "';");
+                            if (result.next())
+                            {
+                                if (result.getLong(1) >= this.file.lastModified())
+                                {
+                                    /*
+                                     * No modifications needed
+                                     */
+                                    updatedSongs++;
+                                    triggerUpdateListeners();
+                                    return;
+                                }
+                                else
+                                {
+                                    state.executeUpdate("UPDATE local_songs SET mod = " + this.file.lastModified() + " WHERE file='" + this.file.getAbsolutePath() + "';");
+                                }
+                            }
                             currentFolder = file.getPath();
+                            triggerUpdateListeners();
                             codec = null;
                             process = Runtime.getRuntime().exec(new String[] {"ffprobe", "-hide_banner", file.getAbsolutePath()});
                             process.waitFor();
@@ -351,82 +609,151 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                 /*
                                  * Update album information.
                                  */
-                                synchronized (albums)
+                                result = state.executeQuery("SELECT album FROM local_albums WHERE album='" + albumTitle + "';");
+                                if (!result.next())
                                 {
-                                    album = albums.get(albumTitle);
-                                    if (album == null)
-                                    {
-                                        album = new Album();
-                                        album.name = albumTitle;
-                                        albums.put(albumTitle, album);
-                                    }
+                                    state.executeUpdate("INSERT INTO local_albums (album) VALUES ('" + albumTitle + "');");
                                 }
-                                if (album.artists == null && albumArtist != null)
+                                result = state.executeQuery("SELECT artists FROM local_albums WHERE album='" + albumTitle + "';");
+                                if (result.getString("artists") == null && albumArtist != null)
                                 {
-                                    album.artists = Arrays.stream(albumArtist.split(";")).map(String::trim).toArray(String[]::new);
-                                    synchronized (albumArtists)
-                                    {
-                                        albumArtists.addAll(Arrays.asList(album.artists));
-                                    }
+                                    state.executeUpdate("UPDATE local_albums SET artists='" + Arrays.stream(albumArtist.split(";")).map(String::trim).collect(Collectors.joining(";")) + "' WHERE album='" + albumTitle + "';");
                                 }
-                                if (album.genres == null && genre != null)
+                                // TODO - Can we get year metadata?
+                                result = state.executeQuery("SELECT genres FROM local_albums WHERE album='" + albumTitle + "';");
+                                if (result.getString("genres") == null && genre != null)
                                 {
-                                    album.genres = Arrays.stream(genre.split(";")).map(String::trim).toArray(String[]::new);
-                                    synchronized (genres)
-                                    {
-                                        genres.addAll(Arrays.asList(album.genres));
-                                    }
+                                    state.executeUpdate("UPDATE local_albums SET genres='" + Arrays.stream(genre.split(";")).map(String::trim).collect(Collectors.joining(";")) + "' WHERE album='" + albumTitle + "';");
                                 }
-                                if (album.totalTracks == 0 && track != null && track[1] > 0)
+                                result = state.executeQuery("SELECT tracks FROM local_albums WHERE album='" + albumTitle + "';");
+                                if (result.getInt("tracks") == 0 && track != null && track[1] > 0)
                                 {
-                                    album.totalTracks = track[1];
+                                    state.executeUpdate("UPDATE local_albums SET tracks=" + track[1] + " WHERE album='" + albumTitle + "';");
                                 }
-                                if (album.totalDiscs == 0 && disc != null && disc[1] > 0)
+                                result = state.executeQuery("SELECT discs FROM local_albums WHERE album='" + albumTitle + "';");
+                                if (result.getInt("discs") == 0 && disc != null && disc[1] > 0)
                                 {
-                                    album.totalDiscs = disc[1];
+                                    state.executeUpdate("UPDATE local_albums SET tracks=" + disc[1] + " WHERE album='" + albumTitle + "';");
                                 }
                                 
                                 /*
                                  * Create the song
                                  */
-                                song = new LocalSong();
-                                song.file = file.getAbsoluteFile();
-                                song.type = type;
-                                song.codec = codec;
-                                song.album = album;
-                                if (title != null)
+                                result = state.executeQuery("SELECT title FROM local_songs WHERE file='" + file.getAbsolutePath() + "';");
+                                if (result.next())
                                 {
-                                    song.title = title;
-                                }
-                                if (artist != null)
-                                {
-                                    song.artists = Arrays.stream(artist.split(";")).map(String::trim).toArray(String[]::new);
-                                    synchronized (artists)
+                                    logger.debug("Updating song cache for {} ({})", title, file);
+                                    StringBuilder sql = new StringBuilder("UPDATE local_songs SET ");
+                                    sql.append("codec='").append(codec).append("', ");
+                                    sql.append("type='").append(codec).append("', ");
+                                    if (title != null && !title.isEmpty())
                                     {
-                                        artists.addAll(Arrays.asList(song.artists));
+                                        sql.append("title='").append(title).append("', ");
                                     }
+                                    else
+                                    {
+                                        sql.append("title='").append(file.getName()).append("', ");
+                                    }
+                                    if (artist != null && !artist.isEmpty())
+                                    {
+                                        sql.append("artists='").append(Optional.of(artist).map(s -> s.split(";")).stream().flatMap(Arrays::stream).map(String::trim).collect(Collectors.joining(";"))).append("', ");
+                                    }
+                                    else
+                                    {
+                                        sql.append("artists=NULL, ");
+                                    }
+                                    if (track != null && track[0] > 0)
+                                    {
+                                        sql.append("track=").append(track[0]).append(", ");
+                                    }
+                                    else
+                                    {
+                                        sql.append("track=NULL, ");
+                                    }
+                                    if (disc != null && disc[0] > 0)
+                                    {
+                                        sql.append("disc=").append(disc[0]).append(", ");
+                                    }
+                                    else
+                                    {
+                                        sql.append("disc=NULL, ");
+                                    }
+                                    if (duration != 0)
+                                    {
+                                        sql.append("duration=").append(duration).append(", ");
+                                    }
+                                    else
+                                    {
+                                        sql.append("duration=NULL, ");
+                                    }
+                                    if (albumTitle != null && !albumTitle.isEmpty())
+                                    {
+                                        sql.append("album='").append(albumTitle).append("', ");
+                                    }
+                                    else
+                                    {
+                                        sql.append("album=NULL, ");
+                                    }
+                                    sql.append("mod=").append(file.lastModified());
+                                    sql.append(" WHERE file='").append(file.getAbsolutePath()).append("';");
+                                    state.executeUpdate(sql.toString());
                                 }
-                                if (disc != null && disc[0] > 0)
+                                else
                                 {
-                                    song.disc = disc[0];
+                                    logger.debug("Caching song {} ({})", title, file);
+                                    StringBuilder sql = new StringBuilder("INSERT INTO local_songs ");
+                                    StringBuilder columns = new StringBuilder("(");
+                                    StringBuilder values = new StringBuilder("(");
+                                    
+                                    columns.append("file,");
+                                    values.append('\'').append(file.getAbsolutePath()).append("',");
+                                    columns.append("codec,");
+                                    values.append('\'').append(codec).append("',");
+                                    columns.append("type,");
+                                    values.append('\'').append(type).append("',");
+                                    if (title != null && !title.isEmpty())
+                                    {
+                                        columns.append("title,");
+                                        values.append('\'').append(title).append("',");
+                                    }
+                                    if (artist != null && !artist.isEmpty())
+                                    {
+                                        columns.append("artists,");
+                                        values.append('\'').append(Optional.of(artist).map(s -> s.split(";")).stream().flatMap(Arrays::stream).map(String::trim).collect(Collectors.joining(";"))).append("',");
+                                    }
+                                    if (track != null && track[0] > 0)
+                                    {
+                                        columns.append("track,");
+                                        values.append(track[0]).append(",");
+                                    }
+                                    if (disc != null && disc[0] > 0)
+                                    {
+                                        columns.append("disc,");
+                                        values.append(disc[0]).append(",");
+                                    }
+                                    if (duration > 0)
+                                    {
+                                        columns.append("duration,");
+                                        values.append(duration).append(",");
+                                    }
+                                    if (albumTitle != null && !albumTitle.isEmpty())
+                                    {
+                                        columns.append("album,");
+                                        values.append('\'').append(albumTitle).append("',");
+                                    }
+                                    
+                                    columns.append("mod");
+                                    values.append(file.lastModified());
+                                    
+                                    columns.append(") VALUES ");
+                                    values.append(");");
+                                    sql.append(columns);
+                                    sql.append(values);
+                                    state.executeUpdate(sql.toString());
                                 }
-                                if (track != null && track[0] > 0)
-                                {
-                                    song.trackNum = track[0];
-                                }
-                                if (duration > 0)
-                                {
-                                    song.duration = duration;
-                                }
-                                
-                                logger.debug("Caching song {} ({})", song, song.file);
                                 
                                 updatedSongs++;
                                 triggerUpdateListeners();
-                                synchronized (songs)
-                                {
-                                    songs.add(song);
-                                }
                             }
                             else
                             {
@@ -438,9 +765,17 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                 logger.trace("Could not find codec for {}", file);
                             }
                         }
+                        catch (SQLException e)
+                        {
+                            logger.error("Could not write song " + file + " to database", e);
+                        }
                         catch (IOException | InterruptedException e)
                         {
                             logger.error("Could not get ffprobe information on " + file, e);
+                        }
+                        finally
+                        {
+                            state.close();
                         }
                     }
                     else
@@ -470,42 +805,18 @@ public class LocalSongProvider implements SongProvider<LocalSong>
         }
     }
     
-    private Connection getDb()
+    private class SongQuery extends RecursiveAction
     {
-        SQLWarning warning;
-        try
+        private final boolean scan;
+        
+        SongQuery(boolean scan)
         {
-            if (this.db == null || this.db.isClosed())
-            {
-                Class.forName("org.sqlite.JDBC");
-                this.db = DriverManager.getConnection("jdbc:sqlite:" + new File(Interface.getDataDir().getAbsolutePath(), "universalmusic.db").getAbsolutePath());
-                this.db.setAutoCommit(false);
-            }
-            warning = this.db.getWarnings();
-            while (warning != null)
-            {
-                logger.warn("SQL Warning: ", warning);
-                warning = warning.getNextWarning();
-            }
-        }
-        catch (SQLException | ClassNotFoundException e)
-        {
-            logger.error("Could not store caching DIR.");
-        }
-        return this.db;
-    }
-    
-    public LocalSongProvider(File source)
-    {
-        Connection dbL = null;
-        this.source = source;
-        if (this.source == null || !this.source.isDirectory())
-        {
-            throw new IllegalArgumentException("File source must be existing directory");
+            this.scan = scan;
         }
         
-        this.getDb();
-        SongScanner.service.submit(() -> {
+        @Override
+        protected void compute()
+        {
             Statement state;
             ResultSet result;
             Album album;
@@ -514,78 +825,110 @@ public class LocalSongProvider implements SongProvider<LocalSong>
             try
             {
                 logger.debug("Querying database.");
-                state = this.getDb().createStatement();
-                result = state.executeQuery("SELECT * FROM LOCAL_ALBUMS;");
-                while (result.next())
+                /*
+                 * Check if the table exists
+                 */
+                state = getDb().createStatement();
+                result = state.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_ALBUMS';");
+                if (!result.next())
                 {
-                    album = new Album();
-                    album.name = result.getString("album");
-                    album.artists = Optional.ofNullable(result.getString("artists")).map(s -> s.split(";")).orElse(new String[0]);
-                    album.year = result.getInt("year");
-                    album.genres = Optional.ofNullable(result.getString("genres")).map(s -> s.split(";")).orElse(new String[0]);
-                    album.totalTracks = result.getInt("tracks");
-                    album.totalDiscs = result.getInt("discs");
-                    albums.put(album.name, album);
+                    logger.debug("Creating album table.");
+                    /*
+                     * Create the table
+                     */
+                    state.executeUpdate("CREATE TABLE LOCAL_ALBUMS" +
+                            "(ALBUM TEXT PRIMARY KEY NOT NULL," +
+                            "ARTISTS TEXT," +
+                            "YEAR INTEGER," +
+                            "GENRES TEXT," +
+                            "TRACKS INTEGER," +
+                            "DISCS INTEGER);");
                 }
-                result = state.executeQuery("SELECT * FROM LOCAL_SONGS;");
-                while (result.next())
+                else
                 {
-                    song = new LocalSong();
-                    song.file = new File(result.getString("file"));
-                    song.codec = result.getString("codec");
-                    song.type = result.getString("type");
-                    song.title = result.getString("title");
-                    song.artists = Optional.ofNullable(result.getString("artists")).map(s -> s.split(";")).orElse(new String[0]);
-                    song.trackNum = result.getInt("track");
-                    song.disc = result.getInt("disc");
-                    song.duration = result.getLong("duration");
-                    song.album = Optional.ofNullable(result.getString("album")).map(albums::get).orElse(null);
-                    songs.add(song);
+                    result = state.executeQuery("SELECT * FROM LOCAL_ALBUMS;");
+                    while (result.next())
+                    {
+                        album = albums.get(result.getString("album"));
+                        if (album == null)
+                        {
+                            album = new Album();
+                            album.name = result.getString("album");
+                            albums.put(album.name, album);
+                        }
+                        album.artists = Optional.ofNullable(result.getString("artists")).map(s -> s.split(";")).orElse(new String[0]);
+                        album.year = result.getInt("year");
+                        album.genres = Optional.ofNullable(result.getString("genres")).map(s -> s.split(";")).orElse(new String[0]);
+                        album.totalTracks = result.getInt("tracks");
+                        album.totalDiscs = result.getInt("discs");
+                    }
                 }
-                result.close();
+                result = state.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_SONGS';");
+                if (!result.next())
+                {
+                    logger.debug("Creating song table.");
+                    /*
+                     * Create the table
+                     */
+                    state.executeUpdate("CREATE TABLE LOCAL_SONGS" +
+                            "(FILE TEXT PRIMARY KEY NOT NULL," +
+                            "CODEC CHAR(5)," +
+                            "TYPE CHAR(5)," +
+                            "TITLE TEXT," +
+                            "ARTISTS TEXT," +
+                            "TRACK INTEGER," +
+                            "DISC INTEGER," +
+                            "DURATION BIGINT," +
+                            "ALBUM TEXT," +
+                            "MOD BIGINT);");
+                }
+                else
+                {
+                    result = state.executeQuery("SELECT * FROM LOCAL_SONGS;");
+                    while (result.next())
+                    {
+                        song = songs.get(new File(result.getString("file")));
+                        if (song == null)
+                        {
+                            song = new LocalSong();
+                            song.file = new File(result.getString("file"));
+                            songs.put(song.file, song);
+                        }
+                        song.codec = result.getString("codec");
+                        song.type = result.getString("type");
+                        song.title = result.getString("title");
+                        song.artists = Optional.ofNullable(result.getString("artists")).map(s -> s.split(";")).orElse(new String[0]);
+                        song.trackNum = result.getInt("track");
+                        song.disc = result.getInt("disc");
+                        song.duration = result.getLong("duration");
+                        song.album = Optional.ofNullable(result.getString("album")).map(albums::get).orElse(null);
+                    }
+                }
                 state.close();
             }
             catch (SQLException e)
             {
                 logger.error("Could not query SQL database.", e);
             }
-            if (songs.isEmpty())
+            logger.debug("Query complete.");
+            updatedSongs = 0;
+            totalUpdate = 0;
+            triggerUpdateListeners();
+            
+            if (scan)
             {
-                logger.debug("No songs within database. Scanning...");
+                logger.debug("Scanning for changes...");
                 totalUpdate = 1;
-                updateSongs();
+                invokeAll(new SongScanner(source), new ScanCompletion());
             }
-            else
-            {
-                try
-                {
-                    this.getDb().commit();
-                    this.getDb().close();
-                    updatedSongs = 0;
-                    totalUpdate = 0;
-                    triggerUpdateListeners();
-                }
-                catch (SQLException e)
-                {
-                    logger.error("Could not close database.", e);
-                }
-            }
-        });
+        }
     }
     
-    /**
-     * Scans the local file system for song files.
-     */
-    private void updateSongs()
+    private class ScanCompletion extends RecursiveAction
     {
-        SongScanner.service.submit(new SongScanner(source));
-        
-        /*
-         * Resets the song scanner when ready.
-         */
-        SongScanner.service.submit(() -> {
-            Statement stat;
-            ResultSet tableResult;
+        @Override
+        protected void compute()
+        {
             while (true)
             {
                 if (SongScanner.service.awaitQuiescence(60, TimeUnit.SECONDS))
@@ -597,276 +940,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
             updatedSongs = 0;
             totalUpdate = 0;
             triggerUpdateListeners();
-            
-            /*
-             * Update the SQL database.
-             */
-            try
-            {
-                logger.debug("Updating local song database.");
-                stat = this.getDb().createStatement();
-                tableResult = stat.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_SONGS';");
-                logger.debug("Table result: {}", tableResult.getCursorName());
-                if (!tableResult.next())
-                {
-                    logger.debug("Creating song table.");
-                    /*
-                     * Create the table
-                     */
-                    stat.executeUpdate("CREATE TABLE LOCAL_SONGS" +
-                            "(FILE TEXT PRIMARY KEY NOT NULL," +
-                            "CODEC CHAR(5)," +
-                            "TYPE CHAR(5)," +
-                            "TITLE TEXT," +
-                            "ARTISTS TEXT," +
-                            "TRACK INTEGER," +
-                            "DISC INTEGER," +
-                            "DURATION BIGINT," +
-                            "ALBUM TEXT);");
-                }
-                else
-                {
-                    logger.debug("Clearing song table.");
-                    stat.executeUpdate("DELETE FROM LOCAL_SONGS;");
-                }
-                tableResult = stat.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_ALBUMS';");
-                if (!tableResult.next())
-                {
-                    logger.debug("Creating album table.");
-                    /*
-                     * Create the table
-                     */
-                    stat.executeUpdate("CREATE TABLE LOCAL_ALBUMS" +
-                            "(ALBUM TEXT PRIMARY KEY NOT NULL," +
-                            "ARTISTS TEXT," +
-                            "YEAR INTEGER," +
-                            "GENRES TEXT," +
-                            "TRACKS INTEGER," +
-                            "DISCS INTEGER);");
-                }
-                else
-                {
-                    logger.debug("Clearing album table.");
-                    stat.executeUpdate("DELETE FROM LOCAL_ALBUMS;");
-                }
-                
-                tableResult.close();
-                
-                for (Album album : this.albums.values())
-                {
-                    stat.executeUpdate("INSERT INTO LOCAL_ALBUMS (ALBUM,ARTISTS,YEAR,GENRES,TRACKS,DISCS) " +
-                            "VALUES ('" + album.name + "', '" + String.join(";", album.artists) + "', " + album.year + ", '" + String.join(";", album.genres) + "', " + album.totalTracks + ", " + album.totalDiscs + ");");
-                }
-                for (LocalSong song : this.songs)
-                {
-                    stat.executeUpdate("INSERT INTO LOCAL_SONGS (FILE,CODEC,TYPE,TITLE,ARTISTS,TRACK,DISC,DURATION,ALBUM) " +
-                            "VALUES ('" + song.file.getAbsolutePath() + "', '" + song.codec + "', '" + song.type + "', '" + song.title + "', '" + String.join(";", song.artists) + "', " + song.trackNum + ", " + song.disc + ", " + song.duration + ", '" + song.album.name + "');");
-                }
-                stat.close();
-                this.getDb().commit();
-                this.getDb().close();
-                logger.debug("Cache updated.");
-            }
-            catch (SQLException e)
-            {
-                logger.error("Error in saving SQLite database", e);
-            }
-        });
-    }
-    
-    /**
-     * Obtains all albums within the collection.
-     *
-     * @return A list of albums.
-     */
-    @Override
-    public Collection<Album> getAlbums()
-    {
-        return this.albums.values();
-    }
-    
-    /**
-     * Obtains all songs within the collection.
-     *
-     * @return A list of songs.
-     */
-    @Override
-    public Collection<LocalSong> getSongs()
-    {
-        synchronized (this.songs)
-        {
-            return Collections.unmodifiableCollection(this.songs);
+            invokeAll(new SongQuery(false));
         }
-    }
-    
-    /**
-     * Obtains a list of all artists.
-     *
-     * @return All artists.
-     */
-    @Override
-    public Collection<String> getArtists()
-    {
-        return this.artists;
-    }
-    
-    /**
-     * Obtains a list of all album artists.
-     *
-     * @return All album artists.
-     */
-    @Override
-    public Collection<String> getAlbumArtists()
-    {
-        return this.albumArtists;
-    }
-    
-    /**
-     * Obtains a list of all genres.
-     *
-     * @return All genres.
-     */
-    @Override
-    public Collection<String> getGenres()
-    {
-        return this.genres;
-    }
-    
-    /**
-     * Obtains a list of all years that have albums.
-     *
-     * @return All years.
-     */
-    @Override
-    public Collection<Integer> getYears()
-    {
-        return this.years;
-    }
-    
-    /**
-     * Obtains all songs from an album.
-     *
-     * @param album - The album to obtain
-     * @return All songs from the requested album, or null if that album is not in the database.
-     */
-    @Override
-    public Collection<LocalSong> getSongsFromAlbum(Album album)
-    {
-        synchronized (this.songs)
-        {
-            return this.songs.stream().filter(song -> song.album.equals(album)).collect(Collectors.toUnmodifiableSet());
-        }
-    }
-    
-    /**
-     * Obtains all songs written by a given artist.
-     *
-     * @param artist - The artist to search for
-     * @return A list of all songs from the specified artist, or null if that artist is not in the
-     * database.
-     */
-    @Override
-    public Collection<LocalSong> getSongsFromArtist(String artist)
-    {
-        synchronized (this.songs)
-        {
-            return this.songs.stream().filter(song -> Arrays.asList(song.artists).contains(artist)).collect(Collectors.toUnmodifiableSet());
-        }
-    }
-    
-    /**
-     * Obtains an album by a specific name.
-     *
-     * @param name - The name to search for.
-     * @return - The first album that matches the given name, or null if that album name is not in
-     * the database.
-     */
-    @Override
-    public Album getAlbumByName(String name)
-    {
-        synchronized (this.albums)
-        {
-            return this.albums.get(name);
-        }
-    }
-    
-    /**
-     * Obtains all albums that were written by a certain artist.
-     *
-     * @param artist - The artist to search for.
-     * @return - The collection on matching albums.
-     */
-    @Override
-    public Collection<Album> getAlbumsFromArtist(String artist)
-    {
-        synchronized (this.albums)
-        {
-            return this.albums.values().stream().filter(album -> Arrays.asList(album.artists).contains(artist)).collect(Collectors.toUnmodifiableSet());
-        }
-    }
-    
-    /**
-     * Obtains all albums that match a certain genre
-     *
-     * @param genre - The genre to search for.
-     * @return - The collection on matching albums.
-     */
-    @Override
-    public Collection<Album> getAlbumsFromGenre(String genre)
-    {
-        synchronized (this.albums)
-        {
-            return this.albums.values().stream().filter(album -> Arrays.asList(album.genres).contains(genre)).collect(Collectors.toUnmodifiableSet());
-        }
-    }
-    
-    /**
-     * Obtains all albums that were released a certain year.
-     *
-     * @param year - The year to search for.
-     * @return - The collection on matching albums.
-     */
-    @Override
-    public Collection<Album> getAlbumsFromYear(int year)
-    {
-        synchronized (this.albums)
-        {
-            return this.albums.values().stream().filter(album -> album.year == year).collect(Collectors.toUnmodifiableSet());
-        }
-    }
-    
-    @Override
-    public int getUpdateProgress()
-    {
-        return this.updatedSongs;
-    }
-    
-    @Override
-    public int getTotalUpdateSongs()
-    {
-        return this.totalUpdate;
-    }
-    
-    @Override
-    public String getUpdateText()
-    {
-        return SongScanner.currentFolder;
-    }
-    
-    @Override
-    public void addUpdateListener(UpdateListener listener)
-    {
-        this.listeners.add(listener);
-    }
-    
-    @Override
-    public void removeUpdateListener(UpdateListener listener)
-    {
-        this.listeners.remove(listener);
-    }
-    
-    protected void triggerUpdateListeners()
-    {
-        this.listeners.forEach(listener -> listener.onUpdate(this.getUpdateProgress(), this.getTotalUpdateSongs(), this.getUpdateText()));
     }
 }

@@ -198,6 +198,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         this.addWindowListener(this);
         
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    
+        this.updateSongs(SongProvider.INSTANCE.getSongs());
     }
     
     @Override
