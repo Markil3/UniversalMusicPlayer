@@ -5,12 +5,7 @@
 package edu.regis.universeplayer.player;
 
 import java.awt.FlowLayout;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import javax.swing.ImageIcon;
@@ -39,23 +34,23 @@ public class CollectionList extends JPanel
      * A link between the JLabel and the object they point towards.
      */
     private Map<JLabel, Object> labelMap = new HashMap<>();
-
+    
     /**
      * A list of all things interested in knowing when we click a collection.
      */
     private LinkedList<SongDisplayListener> listeners = new LinkedList<>();
-
+    
     /**
      * Creates a collections list view.
      */
     public CollectionList()
     {
         super();
-
+        
         FlowLayout layout = new FlowLayout();
         this.setLayout(layout);
     }
-
+    
     /**
      * Updates the collections currently listed, sorted by album.
      *
@@ -65,7 +60,7 @@ public class CollectionList extends JPanel
     public void listCollection(CollectionType type, Collection<?> objects)
     {
         Class<?> fType = objects.stream().filter(Objects::nonNull).map(Object::getClass).findFirst()
-                                .orElse(null);
+                .orElse(null);
         if (objects.isEmpty() || fType == null)
         {
             /*
@@ -78,38 +73,28 @@ public class CollectionList extends JPanel
         if (!type.objectType.isAssignableFrom(fType))
         {
             throw new ClassCastException("Can't assign " + type.objectType
-                                                               .getName() + " from " + fType
+                    .getName() + " from " + fType
                     .getName());
         }
-
+        
         this.labelMap.clear();
         this.removeAll();
         this.type = type;
         switch (type)
         {
-        case album:
-            this.addAlbums(objects.stream().sorted().map(ob -> (Album) ob)
-                                  .collect(Collectors.toList()));
-            break;
-        case artist:
-            this.addArtists(objects.stream().sorted().map(ob -> (String) ob)
-                                   .collect(Collectors.toList()), false);
-            break;
-        case albumArtist:
-            this.addArtists(objects.stream().sorted().map(ob -> (String) ob)
-                                   .collect(Collectors.toList()), true);
-            break;
-        case genre:
-            this.addGenres(objects.stream().sorted().map(ob -> (String) ob)
-                                  .collect(Collectors.toList()));
-            break;
-        case year:
-            this.addYears(objects.stream().sorted().map(ob -> (Integer) ob)
-                                 .collect(Collectors.toList()));
-            break;
+        case album -> this.addAlbums(objects.stream().sorted().map(ob -> (Album) ob)
+                .collect(Collectors.toList()));
+        case artist -> this.addArtists(objects.stream().sorted().map(ob -> (String) ob)
+                .collect(Collectors.toList()), false);
+        case albumArtist -> this.addArtists(objects.stream().sorted().map(ob -> (String) ob)
+                .collect(Collectors.toList()), true);
+        case genre -> this.addGenres(objects.stream().sorted().map(ob -> (String) ob)
+                .collect(Collectors.toList()));
+        case year -> this.addYears(objects.stream().sorted().map(ob -> (Integer) ob)
+                .collect(Collectors.toList()));
         }
     }
-
+    
     /**
      * Updates the display to show a list of artists
      *
@@ -119,10 +104,10 @@ public class CollectionList extends JPanel
     private void addArtists(List<String> artists, boolean album)
     {
         final int ART_SIZE = 128;
-
+        
         JLabel artistLabel;
         ImageIcon icon;
-
+        
         for (String artist : artists)
         {
             artistLabel = new JLabel();
@@ -134,7 +119,7 @@ public class CollectionList extends JPanel
 //            else
 //            {
             icon = new ImageIcon(this.getClass()
-                                     .getResource("/gui/icons/artist.png"), "Default");
+                    .getResource("/gui/icons/artist.png"), "Default");
 //            }
             icon.setImage(icon.getImage().getScaledInstance(ART_SIZE, ART_SIZE, 0));
             artistLabel.setIcon(icon);
@@ -147,20 +132,20 @@ public class CollectionList extends JPanel
                     this.triggerSongDisplayListeners(SongProvider.INSTANCE
                             .getAlbumsFromArtist(artist).stream()
                             .flatMap(album2 -> SongProvider.INSTANCE.getSongsFromAlbum(album2)
-                                                                    .stream())
+                                    .stream())
                             .collect(Collectors.toList()));
                 }
                 else
                 {
-                    this.triggerSongDisplayListeners(SongProvider.INSTANCE
-                            .getSongsFromArtist(artist));
+                    this.triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE
+                            .getSongsFromArtist(artist)));
                 }
             });
             this.add(artistLabel);
             this.labelMap.put(artistLabel, artist);
         }
     }
-
+    
     /**
      * Updates the display to show a list of albums.
      *
@@ -169,34 +154,27 @@ public class CollectionList extends JPanel
     private void addAlbums(List<Album> albums)
     {
         final int ART_SIZE = 128;
-
+        
         JLabel albumLabel;
         ImageIcon icon;
-
+        
         for (Album album : albums)
         {
             albumLabel = new JLabel();
-            if (album.art != null)
-            {
-                icon = album.art;
-            }
-            else
-            {
-                icon = new ImageIcon(this.getClass()
-                                         .getResource("/gui/icons/defaultart.png"), "Default");
-            }
+            icon = Objects.requireNonNullElseGet(album.art, () -> new ImageIcon(this.getClass()
+                    .getResource("/gui/icons/defaultart.png"), "Default"));
             icon.setImage(icon.getImage().getScaledInstance(ART_SIZE, ART_SIZE, 0));
             albumLabel.setIcon(icon);
             albumLabel.setText(album.name);
             albumLabel.setHorizontalTextPosition(JLabel.CENTER);
             albumLabel.setVerticalTextPosition(JLabel.BOTTOM);
-            albumLabel.addMouseListener((ClickListener) mouseEvent -> this.triggerSongDisplayListeners(SongProvider.INSTANCE
-                    .getSongsFromAlbum(album)));
+            albumLabel.addMouseListener((ClickListener) mouseEvent -> this.triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE
+                    .getSongsFromAlbum(album))));
             this.add(albumLabel);
             this.labelMap.put(albumLabel, album);
         }
     }
-
+    
     /**
      * Updates the display to show a list of genres.
      *
@@ -205,10 +183,10 @@ public class CollectionList extends JPanel
     private void addGenres(List<String> genres)
     {
 //        final int ART_SIZE = 128;
-
+        
         JLabel genreLabel;
 //        ImageIcon icon;
-
+        
         for (String genre : genres)
         {
             genreLabel = new JLabel();
@@ -230,13 +208,13 @@ public class CollectionList extends JPanel
             genreLabel.addMouseListener((ClickListener) mouseEvent -> this.triggerSongDisplayListeners(SongProvider.INSTANCE
                     .getAlbumsFromGenre(genre).stream()
                     .flatMap(album2 -> SongProvider.INSTANCE.getSongsFromAlbum(album2)
-                                                            .stream())
+                            .stream())
                     .collect(Collectors.toList())));
             this.add(genreLabel);
             this.labelMap.put(genreLabel, genre);
         }
     }
-
+    
     /**
      * Updates the display to show a list of release years.
      *
@@ -245,10 +223,10 @@ public class CollectionList extends JPanel
     private void addYears(List<Integer> years)
     {
 //        final int ART_SIZE = 128;
-
+        
         JLabel yearLabel;
 //        ImageIcon icon;
-
+        
         for (Integer year : years)
         {
             yearLabel = new JLabel();
@@ -270,13 +248,13 @@ public class CollectionList extends JPanel
             yearLabel.addMouseListener((ClickListener) mouseEvent -> this.triggerSongDisplayListeners(SongProvider.INSTANCE
                     .getAlbumsFromYear(year).stream()
                     .flatMap(album2 -> SongProvider.INSTANCE.getSongsFromAlbum(album2)
-                                                            .stream())
+                            .stream())
                     .collect(Collectors.toList())));
             this.add(yearLabel);
             this.labelMap.put(yearLabel, year);
         }
     }
-
+    
     /**
      * Adds a listener for when the displayed songs should change.
      *
@@ -286,7 +264,7 @@ public class CollectionList extends JPanel
     {
         this.listeners.add(listener);
     }
-
+    
     /**
      * Adds a listener for when the displayed songs should change.
      *
@@ -296,7 +274,7 @@ public class CollectionList extends JPanel
     {
         this.listeners.remove(listener);
     }
-
+    
     /**
      * Triggers all the song display listeners.
      */

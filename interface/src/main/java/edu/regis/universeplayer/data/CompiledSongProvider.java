@@ -4,94 +4,112 @@
 
 package edu.regis.universeplayer.data;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 /**
- * A song provider that serves as a central point for any and all song providers, caching the results in memory for quick and easy access.
+ * A song provider that serves as a central point for any and all song
+ * providers, caching the results in memory for quick and easy access.
  *
  * @author William Hubbard
  * @version 0.1
  */
-public class CompiledSongProvider implements SongProvider
+public class CompiledSongProvider implements SongProvider<Song>
 {
+    private final LinkedList<UpdateListener> listeners = new LinkedList<>();
+    
     /**
      * A set of all providers we pull from
      */
-    private HashMap<SongProvider, Set<Song>> providers = new HashMap<>();
-
+    private final HashMap<SongProvider<?>, Set<Song>> providers = new HashMap<>();
+    
+    /**
+     * The collection of update listeners for each provider.
+     */
+    private final HashMap<SongProvider<?>, UpdateListener> updateListener = new HashMap<>();
+    
     /**
      * A cache of all albums used.
      */
-    private HashMap<Album, Set<Song>> cachedAlbums = new HashMap<>();
-
+    private final HashMap<Album, Set<Song>> cachedAlbums = new HashMap<>();
+    
     /**
      * A cache of all album names.
      */
-    private HashMap<String, Album> cachedAlbumNames = new HashMap<>();
-
+    private final HashMap<String, Album> cachedAlbumNames = new HashMap<>();
+    
     /**
      * A cache of all songs used.
      */
-    private HashSet<Song> cachedSongs = new HashSet<>();
-
+    private final HashSet<Song> cachedSongs = new HashSet<>();
+    
     /**
      * A cache of all song artists used.
      */
-    private HashMap<String, Set<Song>> cachedArtists = new HashMap<>();
-
+    private final HashMap<String, Set<Song>> cachedArtists = new HashMap<>();
+    
     /**
      * A cache of all album artists used.
      */
-    private HashMap<String, Set<Album>> cachedAlbumArtists = new HashMap<>();
-
+    private final HashMap<String, Set<Album>> cachedAlbumArtists = new HashMap<>();
+    
     /**
      * A cache of all genres used.
      */
-    private HashMap<String, Set<Album>> cachedGenres = new HashMap<>();
-
+    private final HashMap<String, Set<Album>> cachedGenres = new HashMap<>();
+    
     /**
      * A cache of all years used.
      */
-    private HashMap<Integer, Set<Album>> cachedYears = new HashMap<>();
-
+    private final HashMap<Integer, Set<Album>> cachedYears = new HashMap<>();
+    
     /**
      * Creates a new CompiledSongProvider containing a set of existing providers.
      *
      * @param providers - Providers to add.
      */
-    public CompiledSongProvider(SongProvider... providers)
+    public CompiledSongProvider(SongProvider<?>... providers)
     {
-        for (SongProvider provider : providers)
+        for (SongProvider<?> provider : providers)
         {
             this.addProvider(provider);
         }
     }
-
+    
     /**
      * Adds a provider to the list
      *
      * @param provider - The provider to add.
      */
-    public void addProvider(SongProvider provider)
+    public void addProvider(SongProvider<?> provider)
     {
+        UpdateListener listener;
         if (!this.providers.containsKey(provider))
         {
             this.providers.put(provider, new HashSet<>(provider.getSongs()));
+            listener = (song, totalSongs, updateText) -> {
+                /*
+                 * Resets the cache.
+                 */
+                if (song == totalSongs || totalSongs == 0)
+                {
+                    this.removeFromCache(this.providers.get(provider));
+                    this.addToCache(provider);
+                }
+                this.triggerUpdateListeners();
+            };
+            provider.addUpdateListener(listener);
             this.addToCache(provider);
         }
     }
-
+    
     /**
      * Caches all the songs contained in a provider.
      *
      * @param provider - The provider to cache.
      */
-    private void addToCache(SongProvider provider)
+    private <T extends Song> void addToCache(SongProvider<T> provider)
     {
-        for (Song song : provider.getSongs())
+        for (T song : provider.getSongs())
         {
             if (this.cachedSongs.add(song))
             {
@@ -141,25 +159,25 @@ public class CompiledSongProvider implements SongProvider
             }
         }
     }
-
+    
     /**
      * Removes a provider from the compilation.
      *
      * @param provider - The provider to remove.
      */
-    public void removeProvider(SongProvider provider)
+    public void removeProvider(SongProvider<?> provider)
     {
-        this.removeFromCache(provider);
+        this.removeFromCache(this.providers.remove(provider));
+        provider.removeUpdateListener(this.updateListener.remove(provider));
     }
-
+    
     /**
      * Removes all songs from a provider from a cache.
      *
-     * @param provider - The provider to move out.
+     * @param songs - The songs to move out.
      */
-    private void removeFromCache(SongProvider provider)
+    private void removeFromCache(Set<Song> songs)
     {
-        Set<Song> songs = this.providers.remove(provider);
         if (songs != null)
         {
             for (Song song : songs)
@@ -206,7 +224,7 @@ public class CompiledSongProvider implements SongProvider
             }
         }
     }
-
+    
     /**
      * Obtains all albums within the collection.
      *
@@ -217,7 +235,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedAlbums.keySet();
     }
-
+    
     /**
      * Obtains all songs within the collection.
      *
@@ -228,7 +246,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedSongs;
     }
-
+    
     /**
      * Obtains a list of all artists.
      *
@@ -239,7 +257,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedArtists.keySet();
     }
-
+    
     /**
      * Obtains a list of all album artists.
      *
@@ -250,7 +268,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedAlbumArtists.keySet();
     }
-
+    
     /**
      * Obtains a list of all genres.
      *
@@ -261,7 +279,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedGenres.keySet();
     }
-
+    
     /**
      * Obtains a list of all years that have albums.
      *
@@ -272,7 +290,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedYears.keySet();
     }
-
+    
     /**
      * Obtains all songs from an album.
      *
@@ -284,7 +302,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedAlbums.get(album);
     }
-
+    
     /**
      * Obtains all songs written by a given artist.
      *
@@ -297,7 +315,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedArtists.get(artist);
     }
-
+    
     /**
      * Obtains an album by a specific name.
      *
@@ -310,7 +328,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedAlbumNames.get(name);
     }
-
+    
     /**
      * Obtains all albums that were written by a certain artist.
      *
@@ -322,7 +340,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedAlbumArtists.get(artist);
     }
-
+    
     /**
      * Obtains all albums that match a certain genre
      *
@@ -334,7 +352,7 @@ public class CompiledSongProvider implements SongProvider
     {
         return this.cachedGenres.get(genre);
     }
-
+    
     /**
      * Obtains all albums that were released a certain year.
      *
@@ -345,5 +363,70 @@ public class CompiledSongProvider implements SongProvider
     public Collection<Album> getAlbumsFromYear(int year)
     {
         return this.cachedYears.get(year);
+    }
+    
+    @Override
+    public int getUpdateProgress()
+    {
+        int totalUpdate = 0;
+        for (SongProvider<?> provider : this.providers.keySet())
+        {
+            totalUpdate += provider.getUpdateProgress();
+        }
+        return totalUpdate;
+    }
+    
+    @Override
+    public int getTotalUpdateSongs()
+    {
+        int totalUpdate = 0;
+        for (SongProvider<?> provider : this.providers.keySet())
+        {
+            if (provider.getTotalUpdateSongs() == -1)
+            {
+                return -1;
+            }
+            else
+            {
+                totalUpdate += provider.getTotalUpdateSongs();
+            }
+        }
+        return totalUpdate;
+    }
+    
+    @Override
+    public String getUpdateText()
+    {
+        for (SongProvider<?> provider: this.providers.keySet())
+        {
+            if (provider.getUpdateText() != null)
+            {
+                return provider.getUpdateText();
+            }
+        }
+        return null;
+    }
+    
+    @Override
+    public void addUpdateListener(UpdateListener listener)
+    {
+        this.listeners.add(listener);
+    }
+    
+    @Override
+    public void removeUpdateListener(UpdateListener listener)
+    {
+        this.listeners.remove(listener);
+    }
+    
+    /**
+     * Triggers all update listeners.
+     */
+    protected void triggerUpdateListeners()
+    {
+        for (UpdateListener listener : this.listeners)
+        {
+            listener.onUpdate(this.getUpdateProgress(), this.getTotalUpdateSongs(), this.getUpdateText());
+        }
     }
 }

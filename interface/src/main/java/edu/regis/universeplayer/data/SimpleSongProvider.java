@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  * @author William Hubbard
  * @version 0.1
  */
-public class SimpleSongProvider implements SongProvider
+public class SimpleSongProvider implements SongProvider<Song>
 {
     private ArrayList<Album> albums;
     private ArrayList<Song> songs;
@@ -174,5 +174,35 @@ public class SimpleSongProvider implements SongProvider
     {
         return this.albums.stream().filter(album -> album.year == year)
                           .sorted().collect(Collectors.toList());
+    }
+    
+    @Override
+    public int getUpdateProgress()
+    {
+        return 0;
+    }
+    
+    @Override
+    public int getTotalUpdateSongs()
+    {
+        return -1;
+    }
+    
+    @Override
+    public String getUpdateText()
+    {
+        return null;
+    }
+    
+    @Override
+    public void addUpdateListener(UpdateListener listener)
+    {
+        // We don't need update listeners here
+    }
+    
+    @Override
+    public void removeUpdateListener(UpdateListener listener)
+    {
+        // We don't need update listeners here
     }
 }

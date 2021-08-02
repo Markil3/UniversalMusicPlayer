@@ -23,7 +23,7 @@ public interface SongDisplayListener extends EventListener
      *
      * @param songs - The songs to display.
      */
-    void updateSongs(Collection<Song> songs);
+    void updateSongs(Collection<? extends Song> songs);
 
     /**
      * Called to display a list of collections

@@ -15,7 +15,8 @@ public class Album implements Comparable<Album>
     public int year;
     public String[] genres;
     public int totalTracks;
-
+    public int totalDiscs;
+    
     @Override
     public int compareTo(Album o)
     {

@@ -36,7 +36,7 @@ public class SongList extends JPanel
         GridBagLayout layout = new GridBagLayout();
         this.setLayout(layout);
 
-        SongProvider provider = SongProvider.INSTANCE;
+        SongProvider<?> provider = SongProvider.INSTANCE;
         this.listAlbums(provider.getSongs());
     }
 
@@ -45,11 +45,11 @@ public class SongList extends JPanel
      *
      * @param songs - The songs to display.
      */
-    public void listAlbums(Collection<Song> songs)
+    public void listAlbums(Collection<? extends Song> songs)
     {
         Map<Album, List<Song>> albums = songs.stream().sorted().collect(Collectors
                 .groupingBy(song -> song.album, Collectors
-                        .mapping(song -> song, Collectors.toList())));
+                        .mapping(song -> (Song) song, Collectors.toList())));
         GridBagConstraints c = new GridBagConstraints(), c2 = new GridBagConstraints();
         c.fill = GridBagConstraints.NONE;
         c.insets = new Insets(0, 0, 20, 0);

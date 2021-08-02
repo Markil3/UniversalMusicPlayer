@@ -4,15 +4,19 @@
 
 package edu.regis.universeplayer.data;
 
+import java.io.Serializable;
+
 /**
  * Contains data for a song.
  */
-public abstract class Song implements Comparable<Song>
+public abstract class Song implements Comparable<Song>, Serializable
 {
     public String title;
     public String[] artists;
     public int trackNum;
     public int disc;
+    public long duration;
+    
     /**
      * A reference to the album this song is part of.
      */

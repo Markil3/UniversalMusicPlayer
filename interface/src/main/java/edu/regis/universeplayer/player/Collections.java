@@ -5,6 +5,7 @@
 package edu.regis.universeplayer.player;
 
 import java.awt.Color;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 
@@ -29,7 +30,7 @@ public class Collections extends JPanel
      * A list of all things interested in knowing when we click a collection.
      */
     private LinkedList<SongDisplayListener> listeners = new LinkedList<>();
-
+    
     /**
      * Creates a collections list view.
      */
@@ -38,11 +39,11 @@ public class Collections extends JPanel
         JLabel label;
         BoxLayout layout = new BoxLayout(this, BoxLayout.Y_AXIS);
         this.setLayout(layout);
-
+        
         this.add(label = new JLabel("All Songs"));
         label.setForeground(Color.BLUE);
         label.addMouseListener((ClickListener) mouseEvent -> this
-                .triggerSongDisplayListeners(SongProvider.INSTANCE.getSongs()));
+                .triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE.getSongs())));
         this.add(label = new JLabel("Artists"));
         label.setForeground(Color.BLUE);
         label.addMouseListener((ClickListener) mouseEvent -> this
@@ -67,7 +68,7 @@ public class Collections extends JPanel
         this.add(label = new JLabel("Playlists"));
         label.setForeground(Color.BLUE);
     }
-
+    
     /**
      * Adds a listener for when the displayed songs should change.
      *
@@ -77,7 +78,7 @@ public class Collections extends JPanel
     {
         this.listeners.add(listener);
     }
-
+    
     /**
      * Adds a listener for when the displayed songs should change.
      *
@@ -87,7 +88,7 @@ public class Collections extends JPanel
     {
         this.listeners.remove(listener);
     }
-
+    
     /**
      * Triggers all the song display listeners.
      */
@@ -98,7 +99,7 @@ public class Collections extends JPanel
             listener.updateSongs(songs);
         }
     }
-
+    
     /**
      * Triggers all the song display listeners.
      */

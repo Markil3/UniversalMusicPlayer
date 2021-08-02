@@ -4,8 +4,17 @@
 
 package edu.regis.universeplayer.player;
 
-import java.awt.BorderLayout;
-import java.awt.Dimension;
+import edu.regis.universeplayer.Player;
+import edu.regis.universeplayer.browser.Browser;
+import edu.regis.universeplayer.data.CollectionType;
+import edu.regis.universeplayer.data.Song;
+import edu.regis.universeplayer.data.SongProvider;
+import edu.regis.universeplayer.data.UpdateListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.swing.*;
+import java.awt.*;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.event.WindowEvent;
@@ -16,49 +25,41 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.concurrent.Future;
 
-import javax.swing.JFrame;
-import javax.swing.JOptionPane;
-import javax.swing.JScrollPane;
-
-import edu.regis.universeplayer.Player;
-import edu.regis.universeplayer.browser.Browser;
-import edu.regis.universeplayer.browser.MessageManager;
-import edu.regis.universeplayer.data.CollectionType;
-import edu.regis.universeplayer.data.Song;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * The Interface class serves as the primary GUI that the player interacts with.
  *
  * @author William Hubbard
  * @version 0.1
  */
-public class Interface extends JFrame implements SongDisplayListener, ComponentListener, WindowListener, PlaybackCommandListener
+public class Interface extends JFrame implements SongDisplayListener, ComponentListener, WindowListener, PlaybackCommandListener, UpdateListener
 {
-    private static Logger logger = LoggerFactory.getLogger(Interface.class);
+    private static final Logger logger = LoggerFactory.getLogger(Interface.class);
     
     /**
      * A reference to the panel containing links to different collection views.
      */
-    private Collections collectionTypes;
+    private final Collections collectionTypes;
     /**
      * A reference to the central view showing a list of songs.
      */
-    private SongList songList;
+    private final SongList songList;
     /**
      * A reference to the central view showing a list of collections.
      */
-    private CollectionList collectionList;
+    private final CollectionList collectionList;
     /**
      * A reference to the central view scroll pane.
      */
-    private JScrollPane centerView;
+    private final JScrollPane centerView;
+    /**
+     * A reference to the player controls pane.
+     */
+    private final PlayerControls controls;
     
     /**
      * A link to the browser.
      */
-    private ArrayList<Player> players = new ArrayList<>();
+    private final ArrayList<Player<?>> players = new ArrayList<>();
     private int currentPlayer = -1;
     
     public static void main(String[] args)
@@ -70,7 +71,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         {
             /*
              * Add this just in case of a crash or something. It won't work if the
-             * program is forcible terminated by the OS, but it could be helpful
+             * program is forcibly terminated by the OS, but it could be helpful
              * otherwise.
              */
             logger.info("Starting application");
@@ -84,7 +85,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 browserThread = new Thread(browser);
                 browserThread.start();
                 Runtime.getRuntime().addShutdownHook(new Thread(browser::close));
-    
+                
                 LinkedList<Future<Object>> pingRequests = new LinkedList<>();
                 for (int i = 0; i < 20; i++)
                 {
@@ -95,7 +96,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 LinkedList<Future<Object>> toRemove = new LinkedList<>();
                 while (pingRequests.size() > 0)
                 {
-                    for (Future<Object> future: pingRequests)
+                    for (Future<Object> future : pingRequests)
                     {
                         if (future.isDone())
                         {
@@ -112,6 +113,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 logger.error("Could not open browser background", e);
                 JOptionPane.showMessageDialog(inter, e, "Could not open browser background", JOptionPane.ERROR_MESSAGE);
             }
+            
+            SongProvider.INSTANCE.addUpdateListener(inter);
         }
         catch (Throwable e)
         {
@@ -126,14 +129,13 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     public Interface()
     {
         super();
-        PlayerControls controls;
         
         this.setTitle("Universal Music Player");
         this.getContentPane().setLayout(new BorderLayout());
         this.getContentPane()
                 .add(this.collectionTypes = new Collections(), BorderLayout.LINE_START);
         this.collectionTypes.addSongDisplayListener(this);
-        controls = new PlayerControls();
+        this.controls = new PlayerControls();
         controls.addCommandListener(this);
         this.getContentPane().add(controls, BorderLayout.PAGE_END);
         
@@ -152,7 +154,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     }
     
     @Override
-    public void updateSongs(Collection<Song> songs)
+    public void updateSongs(Collection<? extends Song> songs)
     {
         this.songList.listAlbums(songs);
         this.centerView.setViewportView(this.songList);
@@ -283,6 +285,20 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         }
         case SEEK -> {
         }
+        }
+    }
+    
+    @Override
+    public void onUpdate(int updated, int totalUpdate, String updating)
+    {
+        this.controls.setUpdateProgress(updated, totalUpdate, updating);
+        if (updated == totalUpdate || totalUpdate == 0)
+        {
+            logger.debug("Resetting the song provider.");
+            /*
+             * TODO - Add some way to get back to the current view, just updated
+             */
+            this.updateSongs(SongProvider.INSTANCE.getSongs());
         }
     }
 }

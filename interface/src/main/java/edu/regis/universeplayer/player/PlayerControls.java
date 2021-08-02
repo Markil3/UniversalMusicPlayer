@@ -8,11 +8,7 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.util.LinkedList;
 
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JPanel;
-import javax.swing.JSlider;
-import javax.swing.SpringLayout;
+import javax.swing.*;
 
 /**
  * This panel contains the buttons necessary for controlling the playback of audio.
@@ -22,15 +18,16 @@ import javax.swing.SpringLayout;
  */
 public class PlayerControls extends JPanel
 {
-    private JButton playButton;
-    private JButton nextButton;
-    private JButton prevButton;
-    private JSlider progress;
+    private final JButton playButton;
+    private final JButton nextButton;
+    private final JButton prevButton;
+    private final JSlider progress;
+    private final JProgressBar updateProgress;
 
     /**
      * A list of all things interested in knowing when we trigger a command.
      */
-    private LinkedList<PlaybackCommandListener> listeners = new LinkedList<>();
+    private final LinkedList<PlaybackCommandListener> listeners = new LinkedList<>();
 
     public PlayerControls()
     {
@@ -54,9 +51,7 @@ public class PlayerControls extends JPanel
         icon.setImage(icon.getImage().getScaledInstance(ICON_SIZE.width, ICON_SIZE.height, 0));
         this.prevButton.setIcon(icon);
         this.prevButton.setPreferredSize(BUTTON_SIZE);
-        this.prevButton.addActionListener(actionEvent -> {
-            this.triggerCommandListeners(PlaybackCommand.PREVIOUS, null);
-        });
+        this.prevButton.addActionListener(actionEvent -> this.triggerCommandListeners(PlaybackCommand.PREVIOUS, null));
         buttonCont.add(this.prevButton);
 
         this.playButton = new JButton();
@@ -64,9 +59,7 @@ public class PlayerControls extends JPanel
         icon.setImage(icon.getImage().getScaledInstance(ICON_SIZE.width, ICON_SIZE.height, 0));
         this.playButton.setIcon(icon);
         this.playButton.setPreferredSize(BUTTON_SIZE);
-        this.playButton.addActionListener(actionEvent -> {
-            this.triggerCommandListeners(PlaybackCommand.PLAY, null);
-        });
+        this.playButton.addActionListener(actionEvent -> this.triggerCommandListeners(PlaybackCommand.PLAY, null));
         buttonCont.add(this.playButton);
 
         this.nextButton = new JButton();
@@ -74,9 +67,7 @@ public class PlayerControls extends JPanel
         icon.setImage(icon.getImage().getScaledInstance(ICON_SIZE.width, ICON_SIZE.height, 0));
         this.nextButton.setIcon(icon);
         this.nextButton.setPreferredSize(BUTTON_SIZE);
-        this.nextButton.addActionListener(actionEvent -> {
-            this.triggerCommandListeners(PlaybackCommand.NEXT, null);
-        });
+        this.nextButton.addActionListener(actionEvent -> this.triggerCommandListeners(PlaybackCommand.NEXT, null));
         buttonCont.add(this.nextButton);
 
         progressLayout = new SpringLayout();
@@ -84,18 +75,50 @@ public class PlayerControls extends JPanel
         this.add(progressCont);
 
         this.progress = new JSlider();
-        this.progress.addChangeListener(changeEvent -> {
-            this.triggerCommandListeners(PlaybackCommand.SEEK, this.progress.getValue());
-        });
+        this.progress.addChangeListener(changeEvent -> this.triggerCommandListeners(PlaybackCommand.SEEK, this.progress.getValue()));
         this.add(this.progress);
+    
+        this.updateProgress = new JProgressBar();
+        this.updateProgress.setStringPainted(true);
+        this.setUpdateProgress(0, 0, null);
+        this.add(this.updateProgress);
 
         layout.putConstraint(SpringLayout.NORTH, buttonCont, 0, SpringLayout.NORTH, this);
         layout.putConstraint(SpringLayout.WEST, buttonCont, 0, SpringLayout.WEST, this);
+        layout.putConstraint(SpringLayout.EAST, buttonCont, 0, SpringLayout.EAST, this);
         layout.putConstraint(SpringLayout.NORTH, this.progress, 5, SpringLayout.SOUTH, buttonCont);
         layout.putConstraint(SpringLayout.WEST, this.progress, 5, SpringLayout.WEST, this);
-        layout.putConstraint(SpringLayout.EAST, this, 5, SpringLayout.EAST, this.progress);
-        layout.putConstraint(SpringLayout.SOUTH, this, 5, SpringLayout.SOUTH, this.progress);
-        layout.putConstraint(SpringLayout.EAST, buttonCont, 0, SpringLayout.EAST, this);
+        layout.putConstraint(SpringLayout.EAST, this.progress, 5, SpringLayout.EAST, this);
+        layout.putConstraint(SpringLayout.NORTH, this.updateProgress, 5, SpringLayout.SOUTH, this.progress);
+        layout.putConstraint(SpringLayout.WEST, this.updateProgress, 5, SpringLayout.WEST, this);
+    
+        layout.putConstraint(SpringLayout.EAST, this, 5, SpringLayout.EAST, this.updateProgress);
+        layout.putConstraint(SpringLayout.SOUTH, this, 5, SpringLayout.SOUTH, this.updateProgress);
+    }
+    
+    void setUpdateProgress(int updated, int toUpdate, String updating)
+    {
+        this.updateProgress.setString(updating);
+        if (toUpdate == 0)
+        {
+            this.updateProgress.setVisible(false);
+//            this.updateProgress.setPreferredSize(new Dimension(this.updateProgress.getPreferredSize().width, 0));
+        }
+        else
+        {
+            this.updateProgress.setVisible(true);
+//            this.updateProgress.setSize(new Dimension(this.updateProgress.getPreferredSize().width, this.updateSize));
+            if (toUpdate < 0)
+            {
+                this.updateProgress.setIndeterminate(true);
+            }
+            else
+            {
+                this.updateProgress.setIndeterminate(false);
+                this.updateProgress.setMaximum(toUpdate);
+                this.updateProgress.setValue(updated);
+            }
+        }
     }
 
     /**
