@@ -20,5 +20,8 @@
         <Logger name="edu.regis.universeplayer.data.LocalSongProvider" level="debug">
             <AppenderRef ref="Console"/>
         </Logger>
+        <Logger name="edu.regis.universeplayer.player.Interface" level="debug">
+            <AppenderRef ref="Console"/>
+        </Logger>
     </Loggers>
 </Configuration>

@@ -4,14 +4,16 @@
 
 package edu.regis.universeplayer.player;
 
-import java.awt.FlowLayout;
+import java.awt.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
-import javax.swing.ImageIcon;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
+import javax.swing.*;
 
+import com.wordpress.tips4java.ScrollablePanel;
 import edu.regis.universeplayer.ClickListener;
 import edu.regis.universeplayer.data.Album;
 import edu.regis.universeplayer.data.CollectionType;
@@ -24,7 +26,7 @@ import edu.regis.universeplayer.data.SongProvider;
  * @author William Hubbard
  * @version 0.1
  */
-public class CollectionList extends JPanel
+public class CollectionList extends ScrollablePanel
 {
     /**
      * The type of collections being displayed.
@@ -33,7 +35,7 @@ public class CollectionList extends JPanel
     /**
      * A link between the JLabel and the object they point towards.
      */
-    private Map<JLabel, Object> labelMap = new HashMap<>();
+    private Map<JButton, Object> labelMap = new HashMap<>();
     
     /**
      * A list of all things interested in knowing when we click a collection.
@@ -49,6 +51,16 @@ public class CollectionList extends JPanel
         
         FlowLayout layout = new FlowLayout();
         this.setLayout(layout);
+        this.setFocusCycleRoot(true);
+//        this.setFocusable(true);
+        this.addFocusListener(new FocusAdapter()
+        {
+            @Override
+            public void focusGained(FocusEvent e)
+            {
+                labelMap.keySet().stream().findFirst().ifPresent(JButton::requestFocusInWindow);
+            }
+        });
     }
     
     /**
@@ -105,12 +117,13 @@ public class CollectionList extends JPanel
     {
         final int ART_SIZE = 128;
         
-        JLabel artistLabel;
+        JButton artistLabel;
         ImageIcon icon;
         
         for (String artist : artists)
         {
-            artistLabel = new JLabel();
+            artistLabel = new JButton();
+            setButtonLook(artistLabel);
             // TODO - Maybe add some sort of artist image lookup?
 //            if (album.art != null)
 //            {
@@ -126,7 +139,7 @@ public class CollectionList extends JPanel
             artistLabel.setText(artist);
             artistLabel.setHorizontalTextPosition(JLabel.CENTER);
             artistLabel.setVerticalTextPosition(JLabel.BOTTOM);
-            artistLabel.addMouseListener((ClickListener) mouseEvent -> {
+            artistLabel.addActionListener(mouseEvent -> {
                 if (album)
                 {
                     this.triggerSongDisplayListeners(SongProvider.INSTANCE
@@ -155,12 +168,13 @@ public class CollectionList extends JPanel
     {
         final int ART_SIZE = 128;
         
-        JLabel albumLabel;
+        JButton albumLabel;
         ImageIcon icon;
         
         for (Album album : albums)
         {
-            albumLabel = new JLabel();
+            albumLabel = new JButton();
+            setButtonLook(albumLabel);
             icon = Objects.requireNonNullElseGet(album.art, () -> new ImageIcon(this.getClass()
                     .getResource("/gui/icons/defaultart.png"), "Default"));
             icon.setImage(icon.getImage().getScaledInstance(ART_SIZE, ART_SIZE, 0));
@@ -168,7 +182,7 @@ public class CollectionList extends JPanel
             albumLabel.setText(album.name);
             albumLabel.setHorizontalTextPosition(JLabel.CENTER);
             albumLabel.setVerticalTextPosition(JLabel.BOTTOM);
-            albumLabel.addMouseListener((ClickListener) mouseEvent -> this.triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE
+            albumLabel.addActionListener(mouseEvent -> this.triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE
                     .getSongsFromAlbum(album))));
             this.add(albumLabel);
             this.labelMap.put(albumLabel, album);
@@ -184,12 +198,13 @@ public class CollectionList extends JPanel
     {
 //        final int ART_SIZE = 128;
         
-        JLabel genreLabel;
+        JButton genreLabel;
 //        ImageIcon icon;
         
         for (String genre : genres)
         {
-            genreLabel = new JLabel();
+            genreLabel = new JButton();
+            setButtonLook(genreLabel);
             // TODO - Maybe add some sort of artist image lookup?
 //            if (album.art != null)
 //            {
@@ -205,7 +220,7 @@ public class CollectionList extends JPanel
             genreLabel.setText(genre);
             genreLabel.setHorizontalTextPosition(JLabel.CENTER);
             genreLabel.setVerticalTextPosition(JLabel.BOTTOM);
-            genreLabel.addMouseListener((ClickListener) mouseEvent -> this.triggerSongDisplayListeners(SongProvider.INSTANCE
+            genreLabel.addActionListener(mouseEvent -> this.triggerSongDisplayListeners(SongProvider.INSTANCE
                     .getAlbumsFromGenre(genre).stream()
                     .flatMap(album2 -> SongProvider.INSTANCE.getSongsFromAlbum(album2)
                             .stream())
@@ -223,13 +238,14 @@ public class CollectionList extends JPanel
     private void addYears(List<Integer> years)
     {
 //        final int ART_SIZE = 128;
-        
-        JLabel yearLabel;
+    
+        JButton yearLabel;
 //        ImageIcon icon;
         
         for (Integer year : years)
         {
-            yearLabel = new JLabel();
+            yearLabel = new JButton();
+            setButtonLook(yearLabel);
             // TODO - Maybe add some sort of artist image lookup?
 //            if (album.art != null)
 //            {
@@ -245,7 +261,7 @@ public class CollectionList extends JPanel
             yearLabel.setText(year.toString());
             yearLabel.setHorizontalTextPosition(JLabel.CENTER);
             yearLabel.setVerticalTextPosition(JLabel.BOTTOM);
-            yearLabel.addMouseListener((ClickListener) mouseEvent -> this.triggerSongDisplayListeners(SongProvider.INSTANCE
+            yearLabel.addActionListener(mouseEvent -> this.triggerSongDisplayListeners(SongProvider.INSTANCE
                     .getAlbumsFromYear(year).stream()
                     .flatMap(album2 -> SongProvider.INSTANCE.getSongsFromAlbum(album2)
                             .stream())
@@ -253,6 +269,15 @@ public class CollectionList extends JPanel
             this.add(yearLabel);
             this.labelMap.put(yearLabel, year);
         }
+    }
+    
+    private void setButtonLook(JButton button)
+    {
+        button.setFocusPainted(true);
+        button.setMargin(new Insets(0, 0, 0, 0));
+        button.setContentAreaFilled(false);
+        button.setBorderPainted(false);
+        button.setOpaque(false);
     }
     
     /**

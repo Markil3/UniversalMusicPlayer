@@ -4,30 +4,38 @@
 
 package edu.regis.universeplayer.player;
 
-import javax.swing.ImageIcon;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.SpringLayout;
+import javax.swing.*;
+import javax.swing.border.LineBorder;
 
 import edu.regis.universeplayer.data.Album;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.util.Arrays;
 
 /**
  * This panel will display information on an album.
  */
-public class AlbumInfo extends JPanel
+public class AlbumInfo extends JButton
 {
-    private Album album;
-    private JLabel artLabel;
-    private JLabel albumName;
-    private JLabel artists;
-    private JLabel genres;
-    private JLabel year;
-
+    public Album album;
+    public final JLabel artLabel;
+    public final JLabel albumName;
+    public final JLabel artists;
+    public final JLabel genres;
+    public final JLabel year;
+    
     public AlbumInfo()
     {
+        this.removeAll();
+        this.setContentAreaFilled(false);
+        this.setBorder(null);
         SpringLayout infoLayout = new SpringLayout();
         this.setLayout(infoLayout);
-
+        this.setFocusable(true);
+        
+        this.setModel(new DefaultButtonModel());
+        
         this.artLabel = new JLabel();
         this.add(this.artLabel);
         this.albumName = new JLabel("Album");
@@ -38,7 +46,7 @@ public class AlbumInfo extends JPanel
         this.add(this.genres);
         this.year = new JLabel("20XX");
         this.add(this.year);
-
+        
         /*
          * Set the layout information
          */
@@ -52,27 +60,54 @@ public class AlbumInfo extends JPanel
         infoLayout.putConstraint(SpringLayout.WEST, genres, 5, SpringLayout.EAST, artLabel);
         infoLayout.putConstraint(SpringLayout.NORTH, year, 5, SpringLayout.SOUTH, genres);
         infoLayout.putConstraint(SpringLayout.WEST, year, 5, SpringLayout.EAST, artLabel);
-//        infoLayout.putConstraint(SpringLayout.EAST, this, 0, SpringLayout.EAST, albumName);
-        infoLayout.putConstraint(SpringLayout.EAST, this, 0, SpringLayout.EAST, artists);
-//        infoLayout.putConstraint(SpringLayout.EAST, this, 0, SpringLayout.EAST, genres);
-//        infoLayout.putConstraint(SpringLayout.EAST, this, 0, SpringLayout.EAST, year);
+        
+        int maxLength = -1;
+        JLabel longest = null;
+        for (JLabel label : Arrays.asList(albumName, artists, genres, year))
+        {
+            if (label.getWidth() > maxLength)
+            {
+                longest = label;
+                maxLength = longest.getWidth();
+            }
+        }
+        infoLayout.putConstraint(SpringLayout.EAST, this, 0, SpringLayout.EAST, longest);
         infoLayout.putConstraint(SpringLayout.SOUTH, this, 5, SpringLayout.EAST, artLabel);
+        
+        while (this.getMouseListeners().length > 0)
+        {
+            this.removeMouseListener(this.getMouseListeners()[0]);
+        }
+        this.addFocusListener(new FocusAdapter()
+        {
+            @Override
+            public void focusGained(FocusEvent e)
+            {
+                ((AlbumInfo) e.getComponent()).setBorder(new LineBorder(Color.GRAY, 1));
+            }
+            
+            @Override
+            public void focusLost(FocusEvent e)
+            {
+                ((AlbumInfo) e.getComponent()).setBorder(null);
+            }
+        });
     }
-
+    
     public AlbumInfo(Album album)
     {
         this();
         this.updateInfo(album);
     }
-
+    
     public void updateInfo(Album album)
     {
         final int ART_SIZE = 128;
         ImageIcon icon;
         StringBuilder builder;
-
+        
         this.album = album;
-
+        
         if (album.art != null)
         {
             icon = album.art;
@@ -80,13 +115,13 @@ public class AlbumInfo extends JPanel
         else
         {
             icon = new ImageIcon(this.getClass()
-                                     .getResource("/gui/icons/defaultart.png"), "Default");
+                    .getResource("/gui/icons/defaultart.png"), "Default");
         }
         icon.setImage(icon.getImage().getScaledInstance(ART_SIZE, ART_SIZE, 0));
         this.artLabel.setIcon(icon);
-
+        
         this.albumName.setText(album.name);
-
+        
         builder = new StringBuilder();
         if (album.artists != null && album.artists.length >= 1)
         {
@@ -103,7 +138,7 @@ public class AlbumInfo extends JPanel
             }
         }
         this.artists.setText(builder.toString());
-
+        
         builder = new StringBuilder();
         if (album.genres != null && album.genres.length >= 1)
         {
@@ -120,7 +155,7 @@ public class AlbumInfo extends JPanel
             }
         }
         this.genres.setText(builder.toString());
-
+        
         this.year.setText(String.valueOf(album.year));
     }
 }

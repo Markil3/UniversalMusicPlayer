@@ -6,25 +6,21 @@ package edu.regis.universeplayer.player;
 
 import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browser.Browser;
-import edu.regis.universeplayer.data.CollectionType;
-import edu.regis.universeplayer.data.Song;
-import edu.regis.universeplayer.data.SongProvider;
-import edu.regis.universeplayer.data.UpdateListener;
+import edu.regis.universeplayer.data.Queue;
+import edu.regis.universeplayer.data.*;
 import net.harawata.appdirs.AppDirsFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ComponentEvent;
-import java.awt.event.ComponentListener;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;
+import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
+import java.util.Set;
 import java.util.concurrent.Future;
 
 /**
@@ -33,7 +29,7 @@ import java.util.concurrent.Future;
  * @author William Hubbard
  * @version 0.1
  */
-public class Interface extends JFrame implements SongDisplayListener, ComponentListener, WindowListener, PlaybackCommandListener, UpdateListener
+public class Interface extends JFrame implements SongDisplayListener, ComponentListener, WindowListener, PlaybackCommandListener, UpdateListener, FocusListener
 {
     private static final Logger logger = LoggerFactory.getLogger(Interface.class);
     
@@ -44,6 +40,10 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
      * A reference to the panel containing links to different collection views.
      */
     private final Collections collectionTypes;
+    /**
+     * A reference to the panel showing the queue.
+     */
+    private final QueueList queueList;
     /**
      * A reference to the central view showing a list of songs.
      */
@@ -81,8 +81,10 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
              */
             logger.info("Starting application");
             inter = new Interface();
-            inter.pack();
+            inter.setSize(700, 500);
+            SongProvider.INSTANCE.addUpdateListener(inter);
             inter.setVisible(true);
+    
             
             try
             {
@@ -118,8 +120,6 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 logger.error("Could not open browser background", e);
                 JOptionPane.showMessageDialog(inter, e, "Could not open browser background", JOptionPane.ERROR_MESSAGE);
             }
-            
-            SongProvider.INSTANCE.addUpdateListener(inter);
         }
         catch (Throwable e)
         {
@@ -179,14 +179,27 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         
         this.setTitle("Universal Music Player");
         this.getContentPane().setLayout(new BorderLayout());
+        this.setFocusable(true);
+        this.setFocusCycleRoot(true);
+        
         this.getContentPane()
                 .add(this.collectionTypes = new Collections(), BorderLayout.LINE_START);
+        this.collectionTypes.addFocusListener(this);
         this.collectionTypes.addSongDisplayListener(this);
+        
         this.controls = new PlayerControls();
+        this.controls.addFocusListener(this);
         controls.addCommandListener(this);
         this.getContentPane().add(controls, BorderLayout.PAGE_END);
         
+        this.queueList = new QueueList();
+        this.queueList.addFocusListener(this);
+        Queue.getInstance().addQueueChangeListener(this.queueList);
+        Queue.getInstance().addSongChangeListener(this.queueList);
+        this.getContentPane().add(queueList, BorderLayout.LINE_END);
+        
         this.songList = new SongList();
+        this.songList.addFocusListener(this);
         this.collectionList = new CollectionList();
         this.collectionList.addSongDisplayListener(this);
         
@@ -196,7 +209,13 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         
         this.addComponentListener(this);
         this.addWindowListener(this);
-        
+        this.addFocusListener(this);
+    
+        ((SortingFocusTraversalPolicy) this.getFocusTraversalPolicy()).setImplicitDownCycleTraversal(true);
+        this.setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS, Set.of(AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_DOWN, 0), AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_RIGHT, 0)));
+        this.setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS, Set.of(AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_UP, 0), AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_LEFT, 0)));
+        this.setFocusTraversalKeys(KeyboardFocusManager.UP_CYCLE_TRAVERSAL_KEYS, Set.of(AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_TAB, 0)));
+        this.setFocusTraversalKeys(KeyboardFocusManager.DOWN_CYCLE_TRAVERSAL_KEYS, Set.of(AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_TAB, KeyEvent.SHIFT_DOWN_MASK)));
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     
         this.updateSongs(SongProvider.INSTANCE.getSongs());
@@ -207,11 +226,12 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     {
         this.songList.listAlbums(songs);
         this.centerView.setViewportView(this.songList);
-        this.songList.setPreferredSize(new Dimension(this.centerView.getViewport()
-                .getExtentSize().width, Integer.MAX_VALUE));
+//        this.songList.setPreferredSize(new Dimension(this.centerView.getViewport()
+//                .getExtentSize().width, Integer.MAX_VALUE));
         this.songList.setPreferredSize(new Dimension(this.centerView.getViewport()
                 .getExtentSize().width, this.songList
                 .getMinimumSize().height));
+        this.centerView.validate();
     }
     
     @Override
@@ -219,11 +239,12 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     {
         this.collectionList.listCollection(type, collections);
         this.centerView.setViewportView(this.collectionList);
-        this.collectionList.setPreferredSize(new Dimension(this.centerView.getViewport()
-                .getExtentSize().width, Integer.MAX_VALUE));
+//        this.collectionList.setPreferredSize(new Dimension(this.centerView.getViewport()
+//                .getExtentSize().width, Integer.MAX_VALUE));
         this.collectionList.setPreferredSize(new Dimension(this.centerView.getViewport()
                 .getExtentSize().width, this.collectionList
                 .getMinimumSize().height));
+        this.centerView.validate();
     }
     
     @Override
@@ -309,14 +330,10 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     @Override
     public void onCommand(PlaybackCommand command, Object data)
     {
-        Player player;
+        Player player = null;
         if (this.currentPlayer >= 0 && this.currentPlayer < this.players.size())
         {
             player = this.players.get(this.currentPlayer);
-        }
-        else
-        {
-            throw new NullPointerException("No player available");
         }
         switch (command)
         {
@@ -328,10 +345,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         }
         case PAUSE -> {
         }
-        case NEXT -> {
-        }
-        case PREVIOUS -> {
-        }
+        case NEXT -> Queue.getInstance().skipNext();
+        case PREVIOUS -> Queue.getInstance().skipPrev();
         case SEEK -> {
         }
         }
@@ -349,5 +364,86 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
              */
             this.updateSongs(SongProvider.INSTANCE.getSongs());
         }
+    }
+    
+    @Override
+    public void focusGained(FocusEvent e)
+    {
+        Component parent;
+        if (e.getOppositeComponent() == null)
+        {
+            collectionTypes.requestFocusInWindow();
+            return;
+        }
+        parent = e.getOppositeComponent().getParent();
+        if (e.getComponent() == this)
+        {
+            if (parent == collectionTypes)
+            {
+                centerView.getViewport().getView().requestFocusInWindow();
+            }
+            else if (parent == songList || parent == collectionList)
+            {
+                queueList.requestFocusInWindow();
+            }
+            else if (parent == queueList.songList || parent == queueList.header)
+            {
+                controls.requestFocusInWindow();
+            }
+            else if (parent == controls)
+            {
+                collectionTypes.requestFocusInWindow();
+            }
+            else
+            {
+                logger.warn("Unrecognized parent {}", parent);
+                collectionTypes.requestFocusInWindow();
+            }
+        }
+        /*
+         * We are transfering backwards from an inner element
+         */
+        else
+        {
+            int index = -1;
+            Component[] children = ((Container) e.getComponent()).getComponents();
+            for (int i = 0, l = children.length; index == -1 && i < l; i++)
+            {
+                if (children[i] == e.getOppositeComponent())
+                {
+                    index = i;
+                }
+            }
+            if (index != -1)
+            {
+                parent = e.getComponent();
+                if (parent == collectionTypes)
+                {
+                    centerView.getViewport().getView().requestFocusInWindow();
+                }
+                else if (parent == songList || parent == collectionList)
+                {
+                    queueList.requestFocusInWindow();
+                }
+                else if (parent == controls)
+                {
+                    controls.requestFocusInWindow();
+                }
+                else if (parent == queueList.songList || parent == queueList.header)
+                {
+                    collectionTypes.requestFocusInWindow();
+                }
+                else
+                {
+                    logger.warn("Unrecognized parent {}", parent);
+                    collectionTypes.requestFocusInWindow();
+                }
+            }
+        }
+    }
+    
+    @Override
+    public void focusLost(FocusEvent e)
+    {
     }
 }

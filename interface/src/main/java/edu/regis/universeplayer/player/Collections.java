@@ -4,14 +4,15 @@
 
 package edu.regis.universeplayer.player;
 
-import java.awt.Color;
+import java.awt.*;
+import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 
-import javax.swing.BoxLayout;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
+import javax.swing.*;
+import javax.swing.border.LineBorder;
+import javax.swing.plaf.LabelUI;
 
 import edu.regis.universeplayer.ClickListener;
 import edu.regis.universeplayer.data.CollectionType;
@@ -36,37 +37,85 @@ public class Collections extends JPanel
      */
     public Collections()
     {
-        JLabel label;
+        JButton defaultLabel;
+        JButton label;
         BoxLayout layout = new BoxLayout(this, BoxLayout.Y_AXIS);
         this.setLayout(layout);
+        this.setFocusable(true);
+        this.setFocusCycleRoot(true);
         
-        this.add(label = new JLabel("All Songs"));
-        label.setForeground(Color.BLUE);
-        label.addMouseListener((ClickListener) mouseEvent -> this
+        this.add(defaultLabel = label = this.createButton("All Songs"));
+        label.setMnemonic('A');
+        label.addActionListener(mouseEvent -> this
                 .triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE.getSongs())));
-        this.add(label = new JLabel("Artists"));
-        label.setForeground(Color.BLUE);
-        label.addMouseListener((ClickListener) mouseEvent -> this
+        this.add(label = this.createButton("Artists"));
+        label.setMnemonic('T');
+        label.addActionListener(mouseEvent -> this
                 .triggerCollectionDisplayListeners(CollectionType.albumArtist, SongProvider.INSTANCE
                         .getAlbumArtists()));
-        this.add(label = new JLabel("Albums"));
-        label.setForeground(Color.BLUE);
-        label.addMouseListener((ClickListener) mouseEvent -> this
+        this.add(label = this.createButton("Albums"));
+        label.setMnemonic('B');
+        label.addActionListener(mouseEvent -> this
                 .triggerCollectionDisplayListeners(CollectionType.album, SongProvider.INSTANCE
                         .getAlbums()));
-        this.add(label = new JLabel("Genres"));
-        label.setForeground(Color.BLUE);
-        label.addMouseListener((ClickListener) mouseEvent -> this
+        this.add(label = this.createButton("Genres"));
+        label.setMnemonic('G');
+        label.addActionListener(mouseEvent -> this
                 .triggerCollectionDisplayListeners(CollectionType.genre, SongProvider.INSTANCE
                         .getGenres()));
-        this.add(label = new JLabel("Years"));
-        label.setForeground(Color.BLUE);
-        label.addMouseListener((ClickListener) mouseEvent -> this
+        this.add(label = this.createButton("Years"));
+        label.setMnemonic('Y');
+        label.addActionListener(mouseEvent -> this
                 .triggerCollectionDisplayListeners(CollectionType.year, SongProvider.INSTANCE
                         .getYears()));
-        this.add(new JLabel("\u23AF\u23AF\u23AF\u23AF\u23AF\u23AF"));
-        this.add(label = new JLabel("Playlists"));
+        this.add(new JLabel("\u23AF".repeat(6)));
+        this.add(label = this.createButton("Playlists"));
+        label.setMnemonic('P');
+        
+        addMouseListener(new MouseAdapter()
+        {
+            @Override
+            public void mouseClicked(MouseEvent e)
+            {
+                defaultLabel.requestFocusInWindow();
+            }
+        });
+        addFocusListener(new FocusAdapter()
+        {
+            @Override
+            public void focusGained(FocusEvent e)
+            {
+                int index = -1;
+                Component[] children = ((Container) e.getComponent()).getComponents();
+                for (int i = 0, l = children.length; index == -1 && i < l; i++)
+                {
+                    if (children[i] == e.getOppositeComponent())
+                    {
+                        index = i;
+                    }
+                }
+                /*
+                 * Only auto-switch focus if the previous component was not from
+                 * within.
+                 */
+                if (index == -1)
+                {
+                    defaultLabel.requestFocusInWindow();
+                }
+            }
+        });
+    }
+    
+    private JButton createButton(String text)
+    {
+        JButton label = new JButton(text);
+        label.setFocusPainted(true);
+        label.setMargin(new Insets(0, 0, 0, 0));
+        label.setContentAreaFilled(false);
+        label.setBorderPainted(false);
+        label.setOpaque(false);
         label.setForeground(Color.BLUE);
+        return label;
     }
     
     /**

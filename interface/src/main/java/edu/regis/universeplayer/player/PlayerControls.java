@@ -4,8 +4,9 @@
 
 package edu.regis.universeplayer.player;
 
-import java.awt.Dimension;
-import java.awt.FlowLayout;
+import java.awt.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.util.LinkedList;
 
 import javax.swing.*;
@@ -40,6 +41,8 @@ public class PlayerControls extends JPanel
 
         SpringLayout layout = new SpringLayout();
         this.setLayout(layout);
+        this.setFocusable(true);
+        this.setFocusCycleRoot(false);
 
         buttonLayout = new FlowLayout();
         buttonCont = new JPanel(buttonLayout);
@@ -82,6 +85,31 @@ public class PlayerControls extends JPanel
         this.updateProgress.setStringPainted(true);
         this.setUpdateProgress(0, 0, null);
         this.add(this.updateProgress);
+    
+        this.addFocusListener(new FocusAdapter()
+        {
+            @Override
+            public void focusGained(FocusEvent e)
+            {
+                int index = -1;
+                Component[] children = ((Container) e.getComponent()).getComponents();
+                for (int i = 0, l = children.length; index == -1 && i < l; i++)
+                {
+                    if (children[i] == e.getOppositeComponent())
+                    {
+                        index = i;
+                    }
+                }
+                /*
+                 * Only auto-switch focus if the previous component was not from
+                 * within.
+                 */
+                if (index == -1)
+                {
+                    prevButton.requestFocusInWindow();
+                }
+            }
+        });
 
         layout.putConstraint(SpringLayout.NORTH, buttonCont, 0, SpringLayout.NORTH, this);
         layout.putConstraint(SpringLayout.WEST, buttonCont, 0, SpringLayout.WEST, this);

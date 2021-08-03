@@ -443,22 +443,25 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                     {
                         try
                         {
-                            state = getDb().createStatement();
-                            result = state.executeQuery("SELECT mod FROM local_songs WHERE file='" + this.file.getAbsolutePath() + "';");
-                            if (result.next())
+                            synchronized (db)
                             {
-                                if (result.getLong(1) >= this.file.lastModified())
+                                state = getDb().createStatement();
+                                result = state.executeQuery("SELECT mod FROM local_songs WHERE file='" + this.file.getAbsolutePath().replaceAll("'", "''") + "';");
+                                if (result.next())
                                 {
-                                    /*
-                                     * No modifications needed
-                                     */
-                                    updatedSongs++;
-                                    triggerUpdateListeners();
-                                    return;
-                                }
-                                else
-                                {
-                                    state.executeUpdate("UPDATE local_songs SET mod = " + this.file.lastModified() + " WHERE file='" + this.file.getAbsolutePath() + "';");
+                                    if (result.getLong(1) >= this.file.lastModified())
+                                    {
+                                        /*
+                                         * No modifications needed
+                                         */
+                                        updatedSongs++;
+                                        triggerUpdateListeners();
+                                        return;
+                                    }
+                                    else
+                                    {
+                                        state.executeUpdate("UPDATE local_songs SET mod = " + this.file.lastModified() + " WHERE file='" + this.file.getAbsolutePath().replaceAll("'", "''") + "';");
+                                    }
                                 }
                             }
                             currentFolder = file.getPath();
@@ -609,147 +612,153 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                 /*
                                  * Update album information.
                                  */
-                                result = state.executeQuery("SELECT album FROM local_albums WHERE album='" + albumTitle + "';");
-                                if (!result.next())
+                                synchronized (db)
                                 {
-                                    state.executeUpdate("INSERT INTO local_albums (album) VALUES ('" + albumTitle + "');");
-                                }
-                                result = state.executeQuery("SELECT artists FROM local_albums WHERE album='" + albumTitle + "';");
-                                if (result.getString("artists") == null && albumArtist != null)
-                                {
-                                    state.executeUpdate("UPDATE local_albums SET artists='" + Arrays.stream(albumArtist.split(";")).map(String::trim).collect(Collectors.joining(";")) + "' WHERE album='" + albumTitle + "';");
-                                }
-                                // TODO - Can we get year metadata?
-                                result = state.executeQuery("SELECT genres FROM local_albums WHERE album='" + albumTitle + "';");
-                                if (result.getString("genres") == null && genre != null)
-                                {
-                                    state.executeUpdate("UPDATE local_albums SET genres='" + Arrays.stream(genre.split(";")).map(String::trim).collect(Collectors.joining(";")) + "' WHERE album='" + albumTitle + "';");
-                                }
-                                result = state.executeQuery("SELECT tracks FROM local_albums WHERE album='" + albumTitle + "';");
-                                if (result.getInt("tracks") == 0 && track != null && track[1] > 0)
-                                {
-                                    state.executeUpdate("UPDATE local_albums SET tracks=" + track[1] + " WHERE album='" + albumTitle + "';");
-                                }
-                                result = state.executeQuery("SELECT discs FROM local_albums WHERE album='" + albumTitle + "';");
-                                if (result.getInt("discs") == 0 && disc != null && disc[1] > 0)
-                                {
-                                    state.executeUpdate("UPDATE local_albums SET tracks=" + disc[1] + " WHERE album='" + albumTitle + "';");
-                                }
-                                
-                                /*
-                                 * Create the song
-                                 */
-                                result = state.executeQuery("SELECT title FROM local_songs WHERE file='" + file.getAbsolutePath() + "';");
-                                if (result.next())
-                                {
-                                    logger.debug("Updating song cache for {} ({})", title, file);
-                                    StringBuilder sql = new StringBuilder("UPDATE local_songs SET ");
-                                    sql.append("codec='").append(codec).append("', ");
-                                    sql.append("type='").append(codec).append("', ");
-                                    if (title != null && !title.isEmpty())
+                                    /*
+                                     * This part in particular is prone to thread-safety issues.
+                                     */
+                                    result = state.executeQuery("SELECT album FROM local_albums WHERE album='" + albumTitle + "';");
+                                    if (!result.next())
                                     {
-                                        sql.append("title='").append(title).append("', ");
+                                        state.executeUpdate("INSERT INTO local_albums (album) VALUES ('" + albumTitle + "');");
                                     }
-                                    else
+                                    result = state.executeQuery("SELECT artists FROM local_albums WHERE album='" + albumTitle + "';");
+                                    if (result.getString("artists") == null && albumArtist != null)
                                     {
-                                        sql.append("title='").append(file.getName()).append("', ");
+                                        state.executeUpdate("UPDATE local_albums SET artists='" + Arrays.stream(albumArtist.split(";")).map(String::trim).collect(Collectors.joining(";")) + "' WHERE album='" + albumTitle + "';");
                                     }
-                                    if (artist != null && !artist.isEmpty())
+                                    // TODO - Can we get year metadata?
+                                    result = state.executeQuery("SELECT genres FROM local_albums WHERE album='" + albumTitle + "';");
+                                    if (result.getString("genres") == null && genre != null)
                                     {
-                                        sql.append("artists='").append(Optional.of(artist).map(s -> s.split(";")).stream().flatMap(Arrays::stream).map(String::trim).collect(Collectors.joining(";"))).append("', ");
+                                        state.executeUpdate("UPDATE local_albums SET genres='" + Arrays.stream(genre.split(";")).map(String::trim).collect(Collectors.joining(";")) + "' WHERE album='" + albumTitle + "';");
                                     }
-                                    else
+                                    result = state.executeQuery("SELECT tracks FROM local_albums WHERE album='" + albumTitle + "';");
+                                    if (result.getInt("tracks") == 0 && track != null && track[1] > 0)
                                     {
-                                        sql.append("artists=NULL, ");
+                                        state.executeUpdate("UPDATE local_albums SET tracks=" + track[1] + " WHERE album='" + albumTitle + "';");
                                     }
-                                    if (track != null && track[0] > 0)
+                                    result = state.executeQuery("SELECT discs FROM local_albums WHERE album='" + albumTitle + "';");
+                                    if (result.getInt("discs") == 0 && disc != null && disc[1] > 0)
                                     {
-                                        sql.append("track=").append(track[0]).append(", ");
-                                    }
-                                    else
-                                    {
-                                        sql.append("track=NULL, ");
-                                    }
-                                    if (disc != null && disc[0] > 0)
-                                    {
-                                        sql.append("disc=").append(disc[0]).append(", ");
-                                    }
-                                    else
-                                    {
-                                        sql.append("disc=NULL, ");
-                                    }
-                                    if (duration != 0)
-                                    {
-                                        sql.append("duration=").append(duration).append(", ");
-                                    }
-                                    else
-                                    {
-                                        sql.append("duration=NULL, ");
-                                    }
-                                    if (albumTitle != null && !albumTitle.isEmpty())
-                                    {
-                                        sql.append("album='").append(albumTitle).append("', ");
-                                    }
-                                    else
-                                    {
-                                        sql.append("album=NULL, ");
-                                    }
-                                    sql.append("mod=").append(file.lastModified());
-                                    sql.append(" WHERE file='").append(file.getAbsolutePath()).append("';");
-                                    state.executeUpdate(sql.toString());
-                                }
-                                else
-                                {
-                                    logger.debug("Caching song {} ({})", title, file);
-                                    StringBuilder sql = new StringBuilder("INSERT INTO local_songs ");
-                                    StringBuilder columns = new StringBuilder("(");
-                                    StringBuilder values = new StringBuilder("(");
-                                    
-                                    columns.append("file,");
-                                    values.append('\'').append(file.getAbsolutePath()).append("',");
-                                    columns.append("codec,");
-                                    values.append('\'').append(codec).append("',");
-                                    columns.append("type,");
-                                    values.append('\'').append(type).append("',");
-                                    if (title != null && !title.isEmpty())
-                                    {
-                                        columns.append("title,");
-                                        values.append('\'').append(title).append("',");
-                                    }
-                                    if (artist != null && !artist.isEmpty())
-                                    {
-                                        columns.append("artists,");
-                                        values.append('\'').append(Optional.of(artist).map(s -> s.split(";")).stream().flatMap(Arrays::stream).map(String::trim).collect(Collectors.joining(";"))).append("',");
-                                    }
-                                    if (track != null && track[0] > 0)
-                                    {
-                                        columns.append("track,");
-                                        values.append(track[0]).append(",");
-                                    }
-                                    if (disc != null && disc[0] > 0)
-                                    {
-                                        columns.append("disc,");
-                                        values.append(disc[0]).append(",");
-                                    }
-                                    if (duration > 0)
-                                    {
-                                        columns.append("duration,");
-                                        values.append(duration).append(",");
-                                    }
-                                    if (albumTitle != null && !albumTitle.isEmpty())
-                                    {
-                                        columns.append("album,");
-                                        values.append('\'').append(albumTitle).append("',");
+                                        state.executeUpdate("UPDATE local_albums SET tracks=" + disc[1] + " WHERE album='" + albumTitle + "';");
                                     }
                                     
-                                    columns.append("mod");
-                                    values.append(file.lastModified());
-                                    
-                                    columns.append(") VALUES ");
-                                    values.append(");");
-                                    sql.append(columns);
-                                    sql.append(values);
-                                    state.executeUpdate(sql.toString());
+                                    /*
+                                     * Create the song
+                                     */
+                                    result = state.executeQuery("SELECT title FROM local_songs WHERE file='" + file.getAbsolutePath().replaceAll("'", "''") + "';");
+                                    if (result.next())
+                                    {
+                                        logger.debug("Updating song cache for {} ({})", title, file);
+                                        StringBuilder sql = new StringBuilder("UPDATE local_songs SET ");
+                                        sql.append("codec='").append(codec).append("', ");
+                                        sql.append("type='").append(codec).append("', ");
+                                        if (title != null && !title.isEmpty())
+                                        {
+                                            sql.append("title='").append(title).append("', ");
+                                        }
+                                        else
+                                        {
+                                            sql.append("title='").append(file.getName()).append("', ");
+                                        }
+                                        if (artist != null && !artist.isEmpty())
+                                        {
+                                            sql.append("artists='").append(Optional.of(artist).map(s -> s.split(";")).stream().flatMap(Arrays::stream).map(String::trim).collect(Collectors.joining(";"))).append("', ");
+                                        }
+                                        else
+                                        {
+                                            sql.append("artists=NULL, ");
+                                        }
+                                        if (track != null && track[0] > 0)
+                                        {
+                                            sql.append("track=").append(track[0]).append(", ");
+                                        }
+                                        else
+                                        {
+                                            sql.append("track=NULL, ");
+                                        }
+                                        if (disc != null && disc[0] > 0)
+                                        {
+                                            sql.append("disc=").append(disc[0]).append(", ");
+                                        }
+                                        else
+                                        {
+                                            sql.append("disc=NULL, ");
+                                        }
+                                        if (duration != 0)
+                                        {
+                                            sql.append("duration=").append(duration).append(", ");
+                                        }
+                                        else
+                                        {
+                                            sql.append("duration=NULL, ");
+                                        }
+                                        if (albumTitle != null && !albumTitle.isEmpty())
+                                        {
+                                            sql.append("album='").append(albumTitle).append("', ");
+                                        }
+                                        else
+                                        {
+                                            sql.append("album=NULL, ");
+                                        }
+                                        sql.append("mod=").append(file.lastModified());
+                                        sql.append(" WHERE file='").append(file.getAbsolutePath().replaceAll("'", "''")).append("';");
+                                        state.executeUpdate(sql.toString());
+                                    }
+                                    else
+                                    {
+                                        logger.debug("Caching song {} ({})", title, file);
+                                        StringBuilder sql = new StringBuilder("INSERT INTO local_songs ");
+                                        StringBuilder columns = new StringBuilder("(");
+                                        StringBuilder values = new StringBuilder("(");
+                                        
+                                        columns.append("file,");
+                                        values.append('\'').append(file.getAbsolutePath().replaceAll("'", "''")).append("',");
+                                        columns.append("codec,");
+                                        values.append('\'').append(codec).append("',");
+                                        columns.append("type,");
+                                        values.append('\'').append(type).append("',");
+                                        if (title != null && !title.isEmpty())
+                                        {
+                                            columns.append("title,");
+                                            values.append('\'').append(title).append("',");
+                                        }
+                                        if (artist != null && !artist.isEmpty())
+                                        {
+                                            columns.append("artists,");
+                                            values.append('\'').append(Optional.of(artist).map(s -> s.split(";")).stream().flatMap(Arrays::stream).map(String::trim).collect(Collectors.joining(";"))).append("',");
+                                        }
+                                        if (track != null && track[0] > 0)
+                                        {
+                                            columns.append("track,");
+                                            values.append(track[0]).append(",");
+                                        }
+                                        if (disc != null && disc[0] > 0)
+                                        {
+                                            columns.append("disc,");
+                                            values.append(disc[0]).append(",");
+                                        }
+                                        if (duration > 0)
+                                        {
+                                            columns.append("duration,");
+                                            values.append(duration).append(",");
+                                        }
+                                        if (albumTitle != null && !albumTitle.isEmpty())
+                                        {
+                                            columns.append("album,");
+                                            values.append('\'').append(albumTitle).append("',");
+                                        }
+                                        
+                                        columns.append("mod");
+                                        values.append(file.lastModified());
+                                        
+                                        columns.append(") VALUES ");
+                                        values.append(");");
+                                        sql.append(columns);
+                                        sql.append(values);
+                                        state.executeUpdate(sql.toString());
+                                    }
                                 }
                                 
                                 updatedSongs++;
@@ -828,83 +837,86 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                 /*
                  * Check if the table exists
                  */
-                state = getDb().createStatement();
-                result = state.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_ALBUMS';");
-                if (!result.next())
+                synchronized (db)
                 {
-                    logger.debug("Creating album table.");
-                    /*
-                     * Create the table
-                     */
-                    state.executeUpdate("CREATE TABLE LOCAL_ALBUMS" +
-                            "(ALBUM TEXT PRIMARY KEY NOT NULL," +
-                            "ARTISTS TEXT," +
-                            "YEAR INTEGER," +
-                            "GENRES TEXT," +
-                            "TRACKS INTEGER," +
-                            "DISCS INTEGER);");
-                }
-                else
-                {
-                    result = state.executeQuery("SELECT * FROM LOCAL_ALBUMS;");
-                    while (result.next())
+                    state = getDb().createStatement();
+                    result = state.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_ALBUMS';");
+                    if (!result.next())
                     {
-                        album = albums.get(result.getString("album"));
-                        if (album == null)
-                        {
-                            album = new Album();
-                            album.name = result.getString("album");
-                            albums.put(album.name, album);
-                        }
-                        album.artists = Optional.ofNullable(result.getString("artists")).map(s -> s.split(";")).orElse(new String[0]);
-                        album.year = result.getInt("year");
-                        album.genres = Optional.ofNullable(result.getString("genres")).map(s -> s.split(";")).orElse(new String[0]);
-                        album.totalTracks = result.getInt("tracks");
-                        album.totalDiscs = result.getInt("discs");
+                        logger.debug("Creating album table.");
+                        /*
+                         * Create the table
+                         */
+                        state.executeUpdate("CREATE TABLE LOCAL_ALBUMS" +
+                                "(ALBUM TEXT PRIMARY KEY NOT NULL," +
+                                "ARTISTS TEXT," +
+                                "YEAR INTEGER," +
+                                "GENRES TEXT," +
+                                "TRACKS INTEGER," +
+                                "DISCS INTEGER);");
                     }
-                }
-                result = state.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_SONGS';");
-                if (!result.next())
-                {
-                    logger.debug("Creating song table.");
-                    /*
-                     * Create the table
-                     */
-                    state.executeUpdate("CREATE TABLE LOCAL_SONGS" +
-                            "(FILE TEXT PRIMARY KEY NOT NULL," +
-                            "CODEC CHAR(5)," +
-                            "TYPE CHAR(5)," +
-                            "TITLE TEXT," +
-                            "ARTISTS TEXT," +
-                            "TRACK INTEGER," +
-                            "DISC INTEGER," +
-                            "DURATION BIGINT," +
-                            "ALBUM TEXT," +
-                            "MOD BIGINT);");
-                }
-                else
-                {
-                    result = state.executeQuery("SELECT * FROM LOCAL_SONGS;");
-                    while (result.next())
+                    else
                     {
-                        song = songs.get(new File(result.getString("file")));
-                        if (song == null)
+                        result = state.executeQuery("SELECT * FROM LOCAL_ALBUMS;");
+                        while (result.next())
                         {
-                            song = new LocalSong();
-                            song.file = new File(result.getString("file"));
-                            songs.put(song.file, song);
+                            album = albums.get(result.getString("album"));
+                            if (album == null)
+                            {
+                                album = new Album();
+                                album.name = result.getString("album");
+                                albums.put(album.name, album);
+                            }
+                            album.artists = Optional.ofNullable(result.getString("artists")).map(s -> s.split(";")).orElse(new String[0]);
+                            album.year = result.getInt("year");
+                            album.genres = Optional.ofNullable(result.getString("genres")).map(s -> s.split(";")).orElse(new String[0]);
+                            album.totalTracks = result.getInt("tracks");
+                            album.totalDiscs = result.getInt("discs");
                         }
-                        song.codec = result.getString("codec");
-                        song.type = result.getString("type");
-                        song.title = result.getString("title");
-                        song.artists = Optional.ofNullable(result.getString("artists")).map(s -> s.split(";")).orElse(new String[0]);
-                        song.trackNum = result.getInt("track");
-                        song.disc = result.getInt("disc");
-                        song.duration = result.getLong("duration");
-                        song.album = Optional.ofNullable(result.getString("album")).map(albums::get).orElse(null);
                     }
+                    result = state.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_SONGS';");
+                    if (!result.next())
+                    {
+                        logger.debug("Creating song table.");
+                        /*
+                         * Create the table
+                         */
+                        state.executeUpdate("CREATE TABLE LOCAL_SONGS" +
+                                "(FILE TEXT PRIMARY KEY NOT NULL," +
+                                "CODEC CHAR(5)," +
+                                "TYPE CHAR(5)," +
+                                "TITLE TEXT," +
+                                "ARTISTS TEXT," +
+                                "TRACK INTEGER," +
+                                "DISC INTEGER," +
+                                "DURATION BIGINT," +
+                                "ALBUM TEXT," +
+                                "MOD BIGINT);");
+                    }
+                    else
+                    {
+                        result = state.executeQuery("SELECT * FROM LOCAL_SONGS;");
+                        while (result.next())
+                        {
+                            song = songs.get(new File(result.getString("file")));
+                            if (song == null)
+                            {
+                                song = new LocalSong();
+                                song.file = new File(result.getString("file"));
+                                songs.put(song.file, song);
+                            }
+                            song.codec = result.getString("codec");
+                            song.type = result.getString("type");
+                            song.title = result.getString("title");
+                            song.artists = Optional.ofNullable(result.getString("artists")).map(s -> s.split(";")).orElse(new String[0]);
+                            song.trackNum = result.getInt("track");
+                            song.disc = result.getInt("disc");
+                            song.duration = result.getLong("duration");
+                            song.album = Optional.ofNullable(result.getString("album")).map(albums::get).orElse(null);
+                        }
+                    }
+                    state.close();
                 }
-                state.close();
             }
             catch (SQLException e)
             {
