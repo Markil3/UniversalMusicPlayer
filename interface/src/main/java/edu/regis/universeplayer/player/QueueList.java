@@ -12,8 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
-import javax.swing.border.BevelBorder;
-import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
@@ -24,12 +22,11 @@ public class QueueList extends JPanel implements Queue.SongChangeListener, Queue
 {
     private static final Logger logger = LoggerFactory.getLogger(QueueList.class);
     
-    private final JScrollPane scroll;
     final JPanel header;
     final ScrollablePanel songList;
     private int currentHighlight = 0;
     
-    private JButton clearButton;
+    private final JButton clearButton;
     
     public QueueList()
     {
@@ -112,11 +109,11 @@ public class QueueList extends JPanel implements Queue.SongChangeListener, Queue
             }
         });
         this.songList.setScrollableWidth(ScrollablePanel.ScrollableSizeHint.FIT);
-        
-        this.scroll = new JScrollPane(this.songList);
+    
+        JScrollPane scroll = new JScrollPane(this.songList);
 //        this.scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 //        this.scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        this.add(this.scroll, BorderLayout.CENTER);
+        this.add(scroll, BorderLayout.CENTER);
         
         this.addFocusListener(new FocusAdapter()
         {
@@ -228,7 +225,7 @@ public class QueueList extends JPanel implements Queue.SongChangeListener, Queue
         this.validate();
     }
     
-    private class SongMenu extends JPopupMenu
+    private static class SongMenu extends JPopupMenu
     {
         public SongMenu(Song song, Queue queue)
         {
