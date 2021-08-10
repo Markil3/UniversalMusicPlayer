@@ -17,6 +17,7 @@ import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.awt.event.MouseEvent;
 import java.util.Formatter;
 
 public class QueueList extends JPanel implements Queue.SongChangeListener, Queue.QueueChangeListener
@@ -46,9 +47,7 @@ public class QueueList extends JPanel implements Queue.SongChangeListener, Queue
         c.gridwidth = 1;
         header.add(new JLabel(" ".repeat(20) + "Queue" + " ".repeat(20)), c);
         this.clearButton = new JButton("Clear");
-        this.clearButton.addActionListener(e -> {
-            Queue.getInstance().clear();
-        });
+        this.clearButton.addActionListener(e -> Queue.getInstance().clear());
         c.gridy = 1;
         c.gridwidth = 1;
         header.add(clearButton, c);
@@ -163,14 +162,14 @@ public class QueueList extends JPanel implements Queue.SongChangeListener, Queue
     public void onQueueChange(Queue queue)
     {
         Formatter dateForm;
-        JButton songLabel;
         JLabel durationLabel;
         GridBagConstraints c;
         this.songList.removeAll();
         int i = 0;
         for (Song song : queue)
         {
-            songLabel = new JButton(song.title);
+            SongMenu menu = new SongMenu(song, queue);
+            JButton songLabel = new JButton(song.title);
             songLabel.setFocusPainted(true);
             songLabel.setMargin(new Insets(0, 0, 0, 0));
             songLabel.setContentAreaFilled(false);
@@ -179,9 +178,16 @@ public class QueueList extends JPanel implements Queue.SongChangeListener, Queue
             songLabel.setHorizontalAlignment(JLabel.LEFT);
             int songIndex = i;
             songLabel.addMouseListener((ClickListener) e -> {
-                if (e.getClickCount() == 2)
+                if (e.getButton() == MouseEvent.BUTTON1)
                 {
-                    queue.skipToSong(songIndex);
+                    if (e.getClickCount() == 2)
+                    {
+                        queue.skipToSong(songIndex);
+                    }
+                }
+                else if (e.getButton() == MouseEvent.BUTTON3)
+                {
+                    menu.show(songLabel, e.getX(), e.getY());
                 }
             });
             dateForm = new Formatter();
@@ -220,5 +226,20 @@ public class QueueList extends JPanel implements Queue.SongChangeListener, Queue
             this.songList.getComponent(queue.getCurrentIndex() * 2).setForeground(Color.BLUE);
         }
         this.validate();
+    }
+    
+    private class SongMenu extends JPopupMenu
+    {
+        public SongMenu(Song song, Queue queue)
+        {
+            final JMenuItem play = new JMenuItem("Play");
+            final JMenuItem remove = new JMenuItem("Remove");
+            
+            play.addActionListener(e -> queue.skipToSong(queue.indexOf(song)));
+            remove.addActionListener(e -> queue.remove(song));
+            
+            this.add(play);
+            this.add(remove);
+        }
     }
 }
