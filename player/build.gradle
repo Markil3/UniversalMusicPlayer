@@ -16,6 +16,9 @@ library {
         def compileTask = binary.compileTask.get()
         compileTask.includes.from("${Jvm.current().javaHome}/include")
 
+        compileTask.source.from fileTree(dir: "src/main/c", include: "interface.h")
+        compileTask.source.from fileTree(dir: "src/main/c", include: "interface.c")
+        compileTask.source.from fileTree(dir: "src/main/c", include: "player.h")
         compileTask.source.from fileTree(dir: "src/main/c", include: "player.c")
 
         def osFamily = binary.targetPlatform.targetMachine.operatingSystemFamily
@@ -28,6 +31,7 @@ library {
         } else if (osFamily.windows) {
             compileTask.includes.from("${Jvm.current().javaHome}/include/win32")
             compileTask.source.from fileTree(dir: "src/main/c", include: "player_win.c")
+            compileTask.source.from fileTree(dir: "src/main/c", include: "windows_mutex.c")
         }
 		
         def toolChain = binary.toolChain

@@ -17,7 +17,7 @@ public class CommandConfirmation implements Serializable
     /**
      * The error returned by the browser, or null if execution was successful.
      */
-    private BrowserError errorCode;
+    private Throwable errorCode;
     private String message;
     
     /**
@@ -44,7 +44,7 @@ public class CommandConfirmation implements Serializable
      *
      * @param error - The error thrown, or null if the command was successful.
      */
-    public CommandConfirmation(BrowserError error)
+    public CommandConfirmation(Throwable error)
     {
         this.errorCode = error;
     }
@@ -64,7 +64,7 @@ public class CommandConfirmation implements Serializable
      *
      * @return The error, or null if the command was successful.
      */
-    public BrowserError getError()
+    public Throwable getError()
     {
         return this.errorCode;
     }

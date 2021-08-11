@@ -345,7 +345,9 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         }
         case PAUSE -> {
         }
-        case NEXT -> Queue.getInstance().skipNext();
+        case NEXT -> {
+        
+        }
         case PREVIOUS -> Queue.getInstance().skipPrev();
         case SEEK -> {
         }
