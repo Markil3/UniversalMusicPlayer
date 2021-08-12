@@ -22,7 +22,11 @@ public enum PlaybackStatus
      */
     STOPPED,
     /**
+     * The player has is stopped, but just finished a song and may have more.
+     */
+    FINISHED,
+    /**
      * No song is loaded.
      */
-    EMPTY;
+    EMPTY
 }

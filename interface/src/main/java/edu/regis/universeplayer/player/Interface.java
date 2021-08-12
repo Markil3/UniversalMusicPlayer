@@ -8,6 +8,8 @@ import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browser.Browser;
 import edu.regis.universeplayer.data.Queue;
 import edu.regis.universeplayer.data.*;
+import edu.regis.universeplayer.localPlayer.LocalPlayer;
+
 import net.harawata.appdirs.AppDirsFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +31,7 @@ import java.util.concurrent.Future;
  * @author William Hubbard
  * @version 0.1
  */
-public class Interface extends JFrame implements SongDisplayListener, ComponentListener, WindowListener, PlaybackCommandListener, UpdateListener, FocusListener
+public class Interface extends JFrame implements SongDisplayListener, ComponentListener, WindowListener, UpdateListener, FocusListener
 {
     private static final Logger logger = LoggerFactory.getLogger(Interface.class);
     
@@ -84,7 +86,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             inter.setSize(700, 500);
             SongProvider.INSTANCE.addUpdateListener(inter);
             inter.setVisible(true);
-    
+
+            Player.REGISTERED_PLAYERS.put(LocalSong.class, new LocalPlayer());
             
             try
             {
@@ -189,7 +192,6 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         
         this.controls = new PlayerControls();
         this.controls.addFocusListener(this);
-        controls.addCommandListener(this);
         this.getContentPane().add(controls, BorderLayout.PAGE_END);
         
         this.queueList = new QueueList();
@@ -319,39 +321,6 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     public void windowDeactivated(WindowEvent windowEvent)
     {
     
-    }
-    
-    /**
-     * Called when a playback command is issued.
-     *
-     * @param command - The command issued.
-     * @param data    - Additional data relevent to the command.
-     */
-    @Override
-    public void onCommand(PlaybackCommand command, Object data)
-    {
-        Player player = null;
-        if (this.currentPlayer >= 0 && this.currentPlayer < this.players.size())
-        {
-            player = this.players.get(this.currentPlayer);
-        }
-        switch (command)
-        {
-        case PLAY -> {
-            if (data instanceof Song)
-            {
-                player.loadSong((Song) data);
-            }
-        }
-        case PAUSE -> {
-        }
-        case NEXT -> {
-        
-        }
-        case PREVIOUS -> Queue.getInstance().skipPrev();
-        case SEEK -> {
-        }
-        }
     }
     
     @Override

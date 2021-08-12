@@ -4,6 +4,8 @@
 
 package edu.regis.universeplayer.browser;
 
+import edu.regis.universeplayer.PlaybackListener;
+import edu.regis.universeplayer.PlaybackStatus;
 import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browserCommands.*;
 import edu.regis.universeplayer.data.Song;
@@ -161,7 +163,7 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     {
         try
         {
-            return new ForwardedFuture<Void>(this.sendObject(new CommandLoadSong(song.location)));
+            return new ForwardedFuture(this.sendObject(new CommandLoadSong(song.location)));
         }
         catch (IOException e)
         {
@@ -196,7 +198,41 @@ public class Browser extends MessageRunner implements Player<InternetSong>
         }
         return null;
     }
-    
+
+    /**
+     * Adds a listener for playback status updates.
+     *
+     * @param listener - The listener to add.
+     */
+    @Override
+    public void addPlaybackListener(PlaybackListener listener)
+    {
+
+    }
+
+    /**
+     * Checks to see if a listener has been added.
+     *
+     * @param listener - The listener to look for.
+     * @return True if the provided listener has been added, false otherwise.
+     */
+    @Override
+    public boolean hasPlaybackListener(PlaybackListener listener)
+    {
+        return false;
+    }
+
+    /**
+     * Removes a listener for playback status updates.
+     *
+     * @param listener - The listener to remove.
+     */
+    @Override
+    public void removePlaybackListener(PlaybackListener listener)
+    {
+
+    }
+
     @Override
     public QueryFuture<Void> play()
     {
@@ -214,15 +250,29 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     {
         return null;
     }
-    
+
+    /**
+     * Stops playback of the current song.
+     */
+    @Override
+    public QueryFuture<Void> stopSong()
+    {
+        return null;
+    }
+
     @Override
     public QueryFuture<Void> seek(float time)
     {
         return null;
     }
-    
+
+    /**
+     * Obtains the player's current playback status.
+     *
+     * @return A future for the request.
+     */
     @Override
-    public QueryFuture<Boolean> isPaused()
+    public QueryFuture<PlaybackStatus> getStatus()
     {
         return null;
     }
@@ -241,9 +291,9 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     
     private class ForwardedFuture<T> implements QueryFuture<T>
     {
-        private final Future future;
+        private final Future<T> future;
         
-        ForwardedFuture(Future future)
+        ForwardedFuture(Future<T> future)
         {
             this.future = future;
         }

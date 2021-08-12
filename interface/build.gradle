@@ -25,6 +25,7 @@ dependencies {
     implementation 'org.xerial:sqlite-jdbc:3.36.0.1'
     implementation 'com.googlecode.soundlibs:jlayer:1.0.1.4'
     implementation 'com.mpatric:mp3agic:0.9.1'
+    implementation 'uk.co.caprica:vlcj:4.7.1'
     implementation project(":libwave")
     implementation project(":browserCommands")
 
@@ -42,10 +43,5 @@ targetCompatibility = JavaVersion.VERSION_16
 mainClassName = defaultPackage + '.player.Interface'
 //mainClassName = defaultPackage + '.localPlayer.Player'
 
-run {
-    systemProperty "java.library.path", file("${project(":player").buildDir}/lib/main/debug").absolutePath
-}
-
 compileJava.dependsOn rootProject.bundleAddOn
-compileJava.dependsOn ':player:linkDebug'
 compileJava.dependsOn ':addonInter:installAddon'

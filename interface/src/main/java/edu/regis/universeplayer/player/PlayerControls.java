@@ -15,6 +15,8 @@ import org.slf4j.LoggerFactory;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
@@ -41,7 +43,7 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
     private final JButton playButton;
     private final JButton nextButton;
     private final JButton prevButton;
-    private final JSlider progress;
+    private final JProgressBar progress;
     private final JProgressBar updateProgress;
     
     private final ForkJoinPool service = new ForkJoinPool();
@@ -100,8 +102,16 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
         progressCont = new JPanel(progressLayout);
         this.add(progressCont);
         
-        this.progress = new JSlider();
-        this.progress.addChangeListener(changeEvent -> this.seek(((JSlider) changeEvent.getSource()).getValue()));
+        this.progress = new JProgressBar();
+        this.progress.addMouseListener(new MouseAdapter()
+        {
+            @Override
+            public void mouseClicked(MouseEvent e)
+            {
+                seek((float) e.getX() / (float) e.getComponent().getWidth() * ((JProgressBar) e.getComponent()).getMaximum());
+                logger.debug("Changing time");
+            }
+        });
         this.add(this.progress);
         
         this.updateProgress = new JProgressBar();
@@ -142,14 +152,15 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
         layout.putConstraint(SpringLayout.EAST, this.progress, 5, SpringLayout.EAST, this);
         layout.putConstraint(SpringLayout.NORTH, this.updateProgress, 5, SpringLayout.SOUTH, this.progress);
         layout.putConstraint(SpringLayout.WEST, this.updateProgress, 5, SpringLayout.WEST, this);
-        
+    
+        layout.putConstraint(SpringLayout.EAST, this, 5, SpringLayout.EAST, this.progress);
         layout.putConstraint(SpringLayout.EAST, this, 5, SpringLayout.EAST, this.updateProgress);
         layout.putConstraint(SpringLayout.SOUTH, this, 5, SpringLayout.SOUTH, this.updateProgress);
         
         Queue.getInstance().addSongChangeListener(this);
     }
     
-    private void seek(int value)
+    private void seek(float value)
     {
         this.service.execute(() -> {
             if (this.currentPlayer != null)
@@ -172,12 +183,8 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
                 {
                     switch ((PlaybackStatus) this.currentPlayer.getStatus().get())
                     {
-                    case PAUSED -> {
-                        this.currentPlayer.play();
-                    }
-                    case PLAYING -> {
-                        this.currentPlayer.pause();
-                    }
+                    case PAUSED -> this.currentPlayer.play();
+                    case PLAYING -> this.currentPlayer.pause();
                     case STOPPED, EMPTY -> {
                         if (Queue.getInstance().size() > 0)
                         {
@@ -291,14 +298,15 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
         if (this.currentSong != null)
         {
             this.currentPlayer = Player.REGISTERED_PLAYERS.get(this.currentSong.getClass());
-            if (!this.currentPlayer.hasPlaybackListener(this))
-            {
-                this.currentPlayer.addPlaybackListener(this);
-            }
             this.progress.setMaximum((int) (this.currentSong.duration / 1000));
             if (this.currentPlayer != null)
             {
-                this.currentPlayer.play();
+                if (!this.currentPlayer.hasPlaybackListener(this))
+                {
+                    this.currentPlayer.addPlaybackListener(this);
+                }
+                this.currentPlayer.loadSong(this.currentSong);
+//                this.currentPlayer.play();
             }
             else
             {
@@ -320,6 +328,7 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
             switch (status.getStatus())
             {
             case PLAYING -> this.playButton.setIcon(PAUSE_ICON);
+            case FINISHED -> Queue.getInstance().skipNext();
             case PAUSED, STOPPED, EMPTY -> this.playButton.setIcon(PLAY_ICON);
             }
             this.progress.setValue((int) status.getPlayTime());

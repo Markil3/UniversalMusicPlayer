@@ -112,6 +112,7 @@ public class Queue extends ArrayList<Song>
      */
     public Song skipNext()
     {
+        int index = this.currentIndex;
         if (++this.currentIndex >= this.queueOrder.size())
         {
             if (this.repeat)
@@ -122,7 +123,10 @@ public class Queue extends ArrayList<Song>
                  */
                 this.queueOrder.clear();
                 this.getOrder();
-                this.triggerSongChangeListeners();
+                if (this.currentIndex != index)
+                {
+                    this.triggerSongChangeListeners();
+                }
                 return this.getCurrentSong();
             }
             else
@@ -131,11 +135,17 @@ public class Queue extends ArrayList<Song>
                  * Make sure we aren't infinitely increasing the current index.
                  */
                 this.currentIndex = this.queueOrder.size() - 1;
-                this.triggerSongChangeListeners();
+                if (this.currentIndex != index)
+                {
+                    this.triggerSongChangeListeners();
+                }
                 return null;
             }
         }
-        this.triggerSongChangeListeners();
+        if (this.currentIndex != index)
+        {
+            this.triggerSongChangeListeners();
+        }
         return this.getCurrentSong();
     }
     
@@ -146,6 +156,7 @@ public class Queue extends ArrayList<Song>
      */
     public Song skipPrev()
     {
+        int index = this.currentIndex;
         if (--this.currentIndex < 0)
         {
             if (this.repeat)
@@ -157,7 +168,10 @@ public class Queue extends ArrayList<Song>
                 this.currentIndex = 0;
             }
         }
-        this.triggerSongChangeListeners();
+        if (this.currentIndex != index)
+        {
+            this.triggerSongChangeListeners();
+        }
         return this.getCurrentSong();
     }
     
@@ -170,8 +184,12 @@ public class Queue extends ArrayList<Song>
     public Song skipToSong(int index)
     {
         Song song = this.get(index);
-        this.currentIndex = this.queueOrder.indexOf(song);
-        this.triggerSongChangeListeners();
+        index = this.queueOrder.indexOf(song);
+        if (this.currentIndex != index)
+        {
+            this.currentIndex = index;
+            this.triggerSongChangeListeners();
+        }
         return this.getCurrentSong();
     }
     
@@ -197,6 +215,7 @@ public class Queue extends ArrayList<Song>
     @Override
     public boolean add(Song song)
     {
+        Song oldSong = this.getCurrentSong();
         int newIndex;
         if (super.add(song))
         {
@@ -214,6 +233,10 @@ public class Queue extends ArrayList<Song>
                 this.queueOrder.add(song);
             }
             this.triggerQueueChangeListeners();
+            if (this.getCurrentSong() != oldSong)
+            {
+                this.triggerSongChangeListeners();
+            }
             return true;
         }
         return false;
@@ -222,6 +245,7 @@ public class Queue extends ArrayList<Song>
     @Override
     public void add(int index, Song song)
     {
+        Song oldSong = this.getCurrentSong();
         int newIndex;
         super.add(index, song);
         if (this.shuffle)
@@ -237,6 +261,10 @@ public class Queue extends ArrayList<Song>
             this.currentIndex++;
         }
         this.queueOrder.add(newIndex, song);
+        if (this.getCurrentSong() != oldSong)
+        {
+            this.triggerSongChangeListeners();
+        }
         this.triggerQueueChangeListeners();
     }
     
@@ -244,6 +272,7 @@ public class Queue extends ArrayList<Song>
     public Song remove(int index)
     {
         Song removed = super.remove(index);
+        boolean current = this.getCurrentSong() == removed;
         if (removed != null)
         {
             index = this.queueOrder.indexOf(removed);
@@ -253,6 +282,10 @@ public class Queue extends ArrayList<Song>
             }
             this.queueOrder.remove(removed);
             this.triggerQueueChangeListeners();
+            if (current)
+            {
+                this.triggerSongChangeListeners();
+            }
         }
         return removed;
     }
@@ -261,6 +294,7 @@ public class Queue extends ArrayList<Song>
     public boolean remove(Object o)
     {
         int index = this.indexOf(o);
+        boolean removed = this.getCurrentSong() == o;
         if (super.remove(o))
         {
             if (index <= this.currentIndex)
@@ -269,6 +303,10 @@ public class Queue extends ArrayList<Song>
             }
             this.queueOrder.remove(o);
             this.triggerQueueChangeListeners();
+            if (removed)
+            {
+                this.triggerSongChangeListeners();
+            }
             return true;
         }
         return false;
@@ -289,6 +327,7 @@ public class Queue extends ArrayList<Song>
     {
         int newIndex;
         int length = this.size();
+        Song oldSong = this.getCurrentSong();
         if (super.addAll(c))
         {
             for (Song song : c)
@@ -308,6 +347,10 @@ public class Queue extends ArrayList<Song>
                 }
             }
             this.triggerQueueChangeListeners();
+            if (this.getCurrentSong() != oldSong)
+            {
+                this.triggerSongChangeListeners();
+            }
             return true;
         }
         return false;
@@ -318,6 +361,7 @@ public class Queue extends ArrayList<Song>
     {
         int newIndex;
         int i = 0;
+        Song oldSong = this.getCurrentSong();
         if (super.addAll(index, c))
         {
             for (Song song : c)
@@ -337,6 +381,10 @@ public class Queue extends ArrayList<Song>
                 this.queueOrder.add(newIndex, song);
             }
             this.triggerQueueChangeListeners();
+            if (this.getCurrentSong() != oldSong)
+            {
+                this.triggerSongChangeListeners();
+            }
             return true;
         }
         return false;
@@ -345,6 +393,7 @@ public class Queue extends ArrayList<Song>
     @Override
     protected void removeRange(int fromIndex, int toIndex)
     {
+        Song oldSong = this.getCurrentSong();
         for (int i = fromIndex; i < toIndex; i++)
         {
             this.queueOrder.remove(this.get(i));
@@ -355,12 +404,17 @@ public class Queue extends ArrayList<Song>
         }
         super.removeRange(fromIndex, toIndex);
         this.triggerQueueChangeListeners();
+        if (this.getCurrentSong() != oldSong)
+        {
+            this.triggerSongChangeListeners();
+        }
     }
     
     @Override
     public boolean removeAll(Collection<?> c)
     {
         boolean success;
+        Song oldSong = this.getCurrentSong();
         for (int i = 0, removed = 0; i <= this.currentIndex && i < this.size(); i++)
         {
             if (c.contains(this.get(i)))
@@ -371,6 +425,10 @@ public class Queue extends ArrayList<Song>
         this.queueOrder.removeAll(c);
         success = super.removeAll(c);
         this.triggerQueueChangeListeners();
+        if (this.getCurrentSong() != oldSong)
+        {
+            this.triggerSongChangeListeners();
+        }
         return success;
     }
     
@@ -378,6 +436,7 @@ public class Queue extends ArrayList<Song>
     public boolean retainAll(Collection<?> c)
     {
         boolean success;
+        Song oldSong = this.getCurrentSong();
         for (int i = 0, removed = 0; i <= this.currentIndex && i < this.size(); i++)
         {
             if (!c.contains(this.get(i)))
@@ -388,6 +447,10 @@ public class Queue extends ArrayList<Song>
         this.queueOrder.retainAll(c);
         success = super.retainAll(c);
         this.triggerQueueChangeListeners();
+        if (this.getCurrentSong() != oldSong)
+        {
+            this.triggerSongChangeListeners();
+        }
         return success;
     }
     

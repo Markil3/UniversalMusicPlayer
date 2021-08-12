@@ -17,11 +17,11 @@
         <Root level="info">
             <AppenderRef ref="File"/>
         </Root>
-        <Logger name="edu.regis.universeplayer.data.LocalSongProvider" level="debug">
+        <Logger name="edu.regis.universeplayer.localPlayer.LocalPlayer" level="debug">
             <AppenderRef ref="Console"/>
         </Logger>
-        <Logger name="edu.regis.universeplayer.player.Interface" level="debug">
-            <AppenderRef ref="Console"/>
-        </Logger>
+<!--        <Logger name="edu.regis.universeplayer.player.Interface" level="debug">-->
+<!--            <AppenderRef ref="Console"/>-->
+<!--        </Logger>-->
     </Loggers>
 </Configuration>
