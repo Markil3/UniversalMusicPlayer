@@ -108,7 +108,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
      */
     public static Set<String> getCodecs()
     {
-        final Pattern FILEPAT = Pattern.compile("^\\s*D[E.]A[I.][L.][S.]\\s*([a-z1-9_]{2,})\\s*[A-Za-z1-9 \\(\\)-/'\\.\":]+$");
+        final Pattern FILEPAT = Pattern.compile("^\\s*D[E.]A[I.][L.][S.]\\s*([a-z1-9_]{2,})\\s*.+$");
         final Pattern FILEPAT2 = Pattern.compile("[a-z1-9_]{2,}");
         Matcher matcher;
         String ffmpegData;
@@ -427,16 +427,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
             
             try
             {
-                if (file.isDirectory())
-                {
-                    totalUpdate--;
-                    List<SongScanner> tasks = Arrays.stream(Objects.requireNonNullElse(file.listFiles(), new File[0]))
-                            .map(SongScanner::new).collect(Collectors.toList());
-                    totalUpdate += tasks.size();
-                    triggerUpdateListeners();
-                    invokeAll(tasks);
-                }
-                else if (file.getName().lastIndexOf(".") < file.getName().length() - 1)
+                if (file.getName().lastIndexOf(".") < file.getName().length() - 1)
                 {
                     type = file.getName().substring(file.getName().lastIndexOf('.') + 1).toLowerCase();
                     if (getFormats().contains(type))
@@ -454,6 +445,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                         /*
                                          * No modifications needed
                                          */
+                                        logger.debug("No update needed for {}", file);
                                         updatedSongs++;
                                         triggerUpdateListeners();
                                         return;
@@ -465,7 +457,6 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                 }
                             }
                             currentFolder = file.getPath();
-                            triggerUpdateListeners();
                             codec = null;
                             process = Runtime.getRuntime().exec(new String[] {"ffprobe", "-hide_banner", file.getAbsolutePath()});
                             process.waitFor();
@@ -656,11 +647,11 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                         sql.append("type='").append(codec).append("', ");
                                         if (title != null && !title.isEmpty())
                                         {
-                                            sql.append("title='").append(title).append("', ");
+                                            sql.append("title='").append(title.replaceAll("'", "''")).append("', ");
                                         }
                                         else
                                         {
-                                            sql.append("title='").append(file.getName()).append("', ");
+                                            sql.append("title='").append(file.getName().replaceAll("'", "''")).append("', ");
                                         }
                                         if (artist != null && !artist.isEmpty())
                                         {
@@ -722,7 +713,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                         if (title != null && !title.isEmpty())
                                         {
                                             columns.append("title,");
-                                            values.append('\'').append(title).append("',");
+                                            values.append('\'').append(title.replaceAll("'", "''")).append("',");
                                         }
                                         if (artist != null && !artist.isEmpty())
                                         {
@@ -830,6 +821,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
             ResultSet result;
             Album album;
             LocalSong song;
+            int numAlbums = 0, numSongs = 0;
             
             try
             {
@@ -839,6 +831,22 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                  */
                 synchronized (db)
                 {
+                    /*
+                     * Make sure that a "null" album is available
+                     */
+                    
+                    if (albums.get(null) == null)
+                    {
+                        album = new Album();
+                        album.name = "Unknown";
+                        albums.put(null, album);
+                    }
+    
+                    if (albums.get("Unknown") == null)
+                    {
+                        albums.put("Unknown", albums.get(null));
+                    }
+                    
                     state = getDb().createStatement();
                     result = state.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_ALBUMS';");
                     if (!result.next())
@@ -872,6 +880,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                             album.genres = Optional.ofNullable(result.getString("genres")).map(s -> s.split(";")).orElse(new String[0]);
                             album.totalTracks = result.getInt("tracks");
                             album.totalDiscs = result.getInt("discs");
+                            numAlbums++;
                         }
                     }
                     result = state.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_SONGS';");
@@ -898,6 +907,10 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                         result = state.executeQuery("SELECT * FROM LOCAL_SONGS;");
                         while (result.next())
                         {
+                            if (result.getString("file") == null)
+                            {
+                                continue;
+                            }
                             song = songs.get(new File(result.getString("file")));
                             if (song == null)
                             {
@@ -912,7 +925,8 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                             song.trackNum = result.getInt("track");
                             song.disc = result.getInt("disc");
                             song.duration = result.getLong("duration");
-                            song.album = Optional.ofNullable(result.getString("album")).map(albums::get).orElse(null);
+                            song.album = Optional.ofNullable(result.getString("album")).map(albums::get).orElse(albums.get("Unknown"));
+                            numSongs++;
                         }
                     }
                     state.close();
@@ -922,16 +936,41 @@ public class LocalSongProvider implements SongProvider<LocalSong>
             {
                 logger.error("Could not query SQL database.", e);
             }
-            logger.debug("Query complete.");
+            logger.debug("Query complete, retrieved {} albums and {} songs", numAlbums, numSongs);
             updatedSongs = 0;
             totalUpdate = 0;
             triggerUpdateListeners();
             
             if (scan)
             {
-                logger.debug("Scanning for changes...");
-                totalUpdate = 1;
-                invokeAll(new SongScanner(source), new ScanCompletion());
+                LinkedList<SongScanner> scanners = new LinkedList<>();
+                this.invokeFolder(source, scanners);
+                triggerUpdateListeners();
+                logger.debug("Scanning for changes in {} files...", totalUpdate);
+                invokeAll(scanners.toArray(SongScanner[]::new));
+                invokeAll(new ScanCompletion());
+            }
+        }
+        
+        /**
+         * Searches for all files and scans them
+         *
+         * @param dir      - The file to scan
+         * @param scanners - The list to add the scanners to
+         */
+        private void invokeFolder(File dir, List<SongScanner> scanners)
+        {
+            if (dir.isDirectory())
+            {
+                for (File file : Objects.requireNonNullElse(dir.listFiles(), new File[0]))
+                {
+                    this.invokeFolder(file, scanners);
+                }
+            }
+            else
+            {
+                totalUpdate++;
+                scanners.add(new SongScanner(dir));
             }
         }
     }
@@ -948,6 +987,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                     break;
                 }
             }
+            logger.debug("Scan complete. Researching database");
             SongScanner.currentFolder = "";
             updatedSongs = 0;
             totalUpdate = 0;

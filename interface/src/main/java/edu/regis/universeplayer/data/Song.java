@@ -21,13 +21,13 @@ public abstract class Song implements Comparable<Song>, Serializable
      * A reference to the album this song is part of.
      */
     public Album album;
-
+    
     @Override
     public int compareTo(Song o)
     {
         if (o != null)
         {
-            int comp = this.album.compareTo(o.album);
+            int comp = this.album != null ? this.album.compareTo(o.album) : o.album != null ? 1 : 0;
             if (comp == 0)
             {
                 comp = Integer.compare(this.disc, o.disc);
@@ -36,7 +36,7 @@ public abstract class Song implements Comparable<Song>, Serializable
                     comp = Integer.compare(this.trackNum, o.trackNum);
                     if (comp == 0)
                     {
-                        comp = this.title.compareTo(o.title);
+                        comp = this.title != null ? this.title.compareTo(o.title) : o.title != null ? 1 : 0;
                     }
                 }
             }

@@ -48,11 +48,13 @@ public class CollectionList extends ScrollablePanel
     public CollectionList()
     {
         super();
-        
+    
         FlowLayout layout = new FlowLayout();
         this.setLayout(layout);
         this.setFocusCycleRoot(true);
 //        this.setFocusable(true);
+        this.setScrollableWidth(ScrollableSizeHint.FIT);
+        this.setScrollableHeight(ScrollableSizeHint.STRETCH);
         this.addFocusListener(new FocusAdapter()
         {
             @Override

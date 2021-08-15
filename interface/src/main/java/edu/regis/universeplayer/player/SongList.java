@@ -37,6 +37,7 @@ public class SongList extends ScrollablePanel
         this.listAlbums(provider.getSongs());
         
         this.setScrollableWidth(ScrollableSizeHint.FIT);
+        this.setScrollableHeight(ScrollableSizeHint.STRETCH);
         this.setFocusTraversalPolicy(new SongListPolicy());
         this.addFocusListener(new FocusAdapter()
         {

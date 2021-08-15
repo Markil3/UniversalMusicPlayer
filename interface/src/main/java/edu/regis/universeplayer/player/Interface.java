@@ -228,12 +228,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     {
         this.songList.listAlbums(songs);
         this.centerView.setViewportView(this.songList);
-//        this.songList.setPreferredSize(new Dimension(this.centerView.getViewport()
-//                .getExtentSize().width, Integer.MAX_VALUE));
-        this.songList.setPreferredSize(new Dimension(this.centerView.getViewport()
-                .getExtentSize().width, this.songList
-                .getMinimumSize().height));
-        this.centerView.validate();
+        this.songList.revalidate();
+        this.centerView.revalidate();
     }
     
     @Override
@@ -241,27 +237,13 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     {
         this.collectionList.listCollection(type, collections);
         this.centerView.setViewportView(this.collectionList);
-//        this.collectionList.setPreferredSize(new Dimension(this.centerView.getViewport()
-//                .getExtentSize().width, Integer.MAX_VALUE));
-        this.collectionList.setPreferredSize(new Dimension(this.centerView.getViewport()
-                .getExtentSize().width, this.collectionList
-                .getMinimumSize().height));
-        this.centerView.validate();
+        this.collectionList.revalidate();
+        this.centerView.revalidate();
     }
     
     @Override
     public void componentResized(ComponentEvent event)
     {
-        this.songList.setPreferredSize(new Dimension(this.centerView.getViewport()
-                .getExtentSize().width, Integer.MAX_VALUE));
-        this.songList.setPreferredSize(new Dimension(this.centerView.getViewport()
-                .getExtentSize().width, this.songList
-                .getMinimumSize().height));
-        this.collectionList.setPreferredSize(new Dimension(this.centerView.getViewport()
-                .getExtentSize().width, Integer.MAX_VALUE));
-        this.collectionList.setPreferredSize(new Dimension(this.centerView.getViewport()
-                .getExtentSize().width, this.collectionList
-                .getMinimumSize().height));
     }
     
     @Override
