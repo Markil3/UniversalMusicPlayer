@@ -24,7 +24,6 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     private static final HashSet<String> codecs = new HashSet<>();
     
     private final File source;
-    private Connection db;
     
     private final HashMap<File, LocalSong> songs = new HashMap<>();
     private final HashMap<String, Album> albums = new HashMap<>();
@@ -152,31 +151,6 @@ public class LocalSongProvider implements SongProvider<LocalSong>
         return codecs;
     }
     
-    private Connection getDb()
-    {
-        SQLWarning warning;
-        try
-        {
-            if (this.db == null || this.db.isClosed())
-            {
-                Class.forName("org.sqlite.JDBC");
-                this.db = DriverManager.getConnection("jdbc:sqlite:" + new File(Interface.getDataDir().getAbsolutePath(), "universalmusic.db").getAbsolutePath());
-            }
-            warning = this.db.getWarnings();
-            while (warning != null)
-            {
-                logger.warn("SQL Warning: ", warning);
-                warning = warning.getNextWarning();
-            }
-            this.db.clearWarnings();
-        }
-        catch (SQLException | ClassNotFoundException e)
-        {
-            logger.error("Could not store caching DIR.");
-        }
-        return this.db;
-    }
-    
     public LocalSongProvider(File source)
     {
         Connection dbL = null;
@@ -185,8 +159,6 @@ public class LocalSongProvider implements SongProvider<LocalSong>
         {
             throw new IllegalArgumentException("File source must be existing directory");
         }
-        
-        this.getDb();
         getSongCache();
     }
     
@@ -434,9 +406,9 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                     {
                         try
                         {
-                            synchronized (db)
+                            synchronized (DatabaseManager.getDb())
                             {
-                                state = getDb().createStatement();
+                                state = DatabaseManager.getDb().createStatement();
                                 result = state.executeQuery("SELECT mod FROM local_songs WHERE file='" + this.file.getAbsolutePath().replaceAll("'", "''") + "';");
                                 if (result.next())
                                 {
@@ -603,7 +575,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                 /*
                                  * Update album information.
                                  */
-                                synchronized (db)
+                                synchronized (DatabaseManager.getDb())
                                 {
                                     /*
                                      * This part in particular is prone to thread-safety issues.
@@ -829,7 +801,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                 /*
                  * Check if the table exists
                  */
-                synchronized (db)
+                synchronized (DatabaseManager.getDb())
                 {
                     /*
                      * Make sure that a "null" album is available
@@ -847,7 +819,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                         albums.put("Unknown", albums.get(null));
                     }
                     
-                    state = getDb().createStatement();
+                    state = DatabaseManager.getDb().createStatement();
                     result = state.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_ALBUMS';");
                     if (!result.next())
                     {

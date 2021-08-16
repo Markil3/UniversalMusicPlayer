@@ -18,7 +18,7 @@ public interface SongProvider<T extends Song>
     /**
      * A SongProvider instance designed to
      */
-    SongProvider<Song> INSTANCE = new CompiledSongProvider(new LocalSongProvider(new File(System.getProperty("user.home"), "Music")));
+    SongProvider<Song> INSTANCE = new CompiledSongProvider(new LocalSongProvider(new File(System.getProperty("user.home"), "Music")), InternetSongProvider.getInstance());
     
     /**
      * Obtains all albums within the collection.

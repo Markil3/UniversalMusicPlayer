@@ -291,7 +291,10 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
     {
         if (this.currentSong != null)
         {
-            this.currentPlayer.stopSong();
+            if (this.currentPlayer != null)
+            {
+                this.currentPlayer.stopSong();
+            }
         }
         this.currentSong = queue.getCurrentSong();
         this.playButton.setIcon(PLAY_ICON);

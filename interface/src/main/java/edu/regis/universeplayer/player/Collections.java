@@ -71,6 +71,10 @@ public class Collections extends JPanel
         this.add(new JLabel("\u23AF".repeat(6)));
         this.add(label = this.createButton("Playlists"));
         label.setMnemonic('P');
+        this.add(new JLabel("\u23AF".repeat(6)));
+        this.add(label = this.createButton("Add External Song"));
+        label.setMnemonic('E');
+        label.addActionListener(mouseEvent -> this.addNewSong());
         
         addMouseListener(new MouseAdapter()
         {
@@ -104,6 +108,16 @@ public class Collections extends JPanel
                 }
             }
         });
+    }
+    
+    private void addNewSong()
+    {
+        Container parent = this.getParent();
+        while (!(parent instanceof JFrame) && parent != null)
+        {
+            parent = parent.getParent();
+        }
+        new InternetSongDialog((JFrame) parent).setVisible(true);
     }
     
     private JButton createButton(String text)
