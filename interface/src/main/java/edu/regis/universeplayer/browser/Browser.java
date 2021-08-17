@@ -4,20 +4,20 @@
 
 package edu.regis.universeplayer.browser;
 
+import edu.regis.universeplayer.PlaybackInfo;
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
 import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browserCommands.*;
+import edu.regis.universeplayer.data.InternetSong;
+import edu.regis.universeplayer.data.PlaybackEvent;
 import edu.regis.universeplayer.data.Song;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.ConnectException;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
 import java.util.LinkedList;
 import java.util.Scanner;
 import java.util.concurrent.*;
@@ -227,7 +227,7 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     @Override
     public void addPlaybackListener(PlaybackListener listener)
     {
-
+        this.listeners.add(listener);
     }
 
     /**
@@ -239,7 +239,7 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     @Override
     public boolean hasPlaybackListener(PlaybackListener listener)
     {
-        return false;
+        return this.listeners.contains(listener);
     }
 
     /**
@@ -250,9 +250,21 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     @Override
     public void removePlaybackListener(PlaybackListener listener)
     {
-
+        this.listeners.remove(listener);
     }
-
+    
+    @Override
+    protected void triggerUpdateListeners(Object ob)
+    {
+        PlaybackEvent status;
+        super.triggerUpdateListeners(ob);
+        if (ob instanceof PlaybackInfo)
+        {
+            status = new PlaybackEvent(this, (PlaybackInfo) ob);
+            this.listeners.forEach(l -> l.onPlaybackChanged(status));
+        }
+    }
+    
     @Override
     public QueryFuture<Void> play()
     {
@@ -301,7 +313,15 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     @Override
     public QueryFuture<Void> stopSong()
     {
-        return null;
+        try
+        {
+            return new ForwardedFuture(this.sendObject(new CommandLoadSong((URL) null)));
+        }
+        catch (IOException e)
+        {
+            logger.error("Could not send message", e);
+            return null;
+        }
     }
 
     @Override
@@ -331,14 +351,14 @@ public class Browser extends MessageRunner implements Player<InternetSong>
             Future future = this.sendObject(new QueryStatus());
             return new QueryFuture<>() {
                 
-                private CommandReturn<Double> getVal() throws ExecutionException, InterruptedException
+                private CommandReturn<String> getVal() throws ExecutionException, InterruptedException
                 {
-                    return ((CommandReturn<Double>) future.get());
+                    return ((CommandReturn<String>) future.get());
                 }
     
-                private CommandReturn<Double> getVal(long timeout, TimeUnit unit) throws ExecutionException, InterruptedException, TimeoutException
+                private CommandReturn<String> getVal(long timeout, TimeUnit unit) throws ExecutionException, InterruptedException, TimeoutException
                 {
-                    return ((CommandReturn<Double>) future.get(timeout, unit));
+                    return ((CommandReturn<String>) future.get(timeout, unit));
                 }
     
                 @Override
@@ -374,15 +394,15 @@ public class Browser extends MessageRunner implements Player<InternetSong>
                 @Override
                 public PlaybackStatus get() throws InterruptedException, ExecutionException
                 {
-                    Double value = getVal().getReturnValue();
-                    return PlaybackStatus.values()[value.intValue()];
+                    String value = getVal().getReturnValue();
+                    return PlaybackStatus.valueOf(value);
                 }
     
                 @Override
                 public PlaybackStatus get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
                 {
-                    Double value = getVal(timeout, unit).getReturnValue();
-                    return PlaybackStatus.values()[value.intValue()];
+                    String value = getVal(timeout, unit).getReturnValue();
+                    return PlaybackStatus.valueOf(value);
                 }
             };
         }

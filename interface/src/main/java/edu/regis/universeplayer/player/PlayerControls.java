@@ -4,9 +4,11 @@
 
 package edu.regis.universeplayer.player;
 
+import edu.regis.universeplayer.PlaybackInfo;
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
 import edu.regis.universeplayer.Player;
+import edu.regis.universeplayer.data.PlaybackEvent;
 import edu.regis.universeplayer.data.Queue;
 import edu.regis.universeplayer.data.Song;
 import org.slf4j.Logger;
@@ -323,17 +325,18 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
     }
     
     @Override
-    public void onPlaybackChanged(PlaybackInfo status)
+    public void onPlaybackChanged(PlaybackEvent status)
     {
         if (status.getSource() != null && status.getSource() == this.currentPlayer)
         {
-            switch (status.getStatus())
+            switch (status.getInfo().getStatus())
             {
             case PLAYING -> this.playButton.setIcon(PAUSE_ICON);
             case FINISHED -> Queue.getInstance().skipNext();
             case PAUSED, STOPPED, EMPTY -> this.playButton.setIcon(PLAY_ICON);
             }
-            this.progress.setValue((int) status.getPlayTime());
+            this.progress.setValue((int) status.getInfo().getPlayTime());
+            this.progress.setMaximum((int) (status.getInfo().getSong().duration / 1000));
         }
     }
 }

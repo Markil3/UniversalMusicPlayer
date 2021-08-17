@@ -4,7 +4,6 @@
 
 package edu.regis.universeplayer.data;
 
-import edu.regis.universeplayer.browser.InternetSong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

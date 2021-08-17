@@ -52,6 +52,10 @@ public class Main
                  * Pretty much just forwards any messages to the browser and
                  * returns their value.
                  */
+                browserLink.addUpdateListener((update, link) -> {
+                    logger.debug("Sending update {}", update);
+                    interfaceLink.sendUpdate(update);
+                });
                 interfaceLink.addListener((providedValue, previousReturn) -> {
                     logger.debug("Forwarding message to browser: {}", providedValue);
                     Object returnValue = browserLink.sendObject(providedValue).get();

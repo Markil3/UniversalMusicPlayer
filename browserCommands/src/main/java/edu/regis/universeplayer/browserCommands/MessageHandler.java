@@ -9,10 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -33,11 +30,12 @@ public class MessageHandler implements Runnable, MessageSerializer
     private final ExecutorService executor;
     private final LinkedList<MessageListener> listeners = new LinkedList<>();
     protected final HashMap<Integer, Future<Object>> messageResponses = new HashMap<>();
+    protected final Queue<Object> updates = new LinkedList<>();
     
     /**
      * Creates a message handler.
      *
-     * @param name - The name of the handler. This is used in logging.
+     * @param name   - The name of the handler. This is used in logging.
      * @param input  - The input from our external source.
      * @param output - The output to the external source.
      */
@@ -142,6 +140,29 @@ public class MessageHandler implements Runnable, MessageSerializer
                         toRemove.clear();
                     }
                 }
+                
+                /*
+                 * Send in any updates
+                 */
+                synchronized (this.updates)
+                {
+                    if (this.updates.size() > 0)
+                    {
+                        Object update;
+                        while ((update = this.updates.poll()) != null)
+                        {
+                            try
+                            {
+                                messageByte = serializeObject(update);
+                                writeMessage(browserOut, -1, messageByte);
+                            }
+                            catch (IOException e)
+                            {
+                                logger.error("Could not send response message for " + update, e);
+                            }
+                        }
+                    }
+                }
             }
         }
         catch (Throwable e)
@@ -228,6 +249,19 @@ public class MessageHandler implements Runnable, MessageSerializer
         synchronized (this.listeners)
         {
             this.listeners.add(listener);
+        }
+    }
+    
+    /**
+     * Sends an object through the handler as an update not associated with any message.
+     *
+     * @param object - The object to send.
+     */
+    public void sendUpdate(Object object)
+    {
+        synchronized (this.updates)
+        {
+            this.updates.add(object);
         }
     }
     

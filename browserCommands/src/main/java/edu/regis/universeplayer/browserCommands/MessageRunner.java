@@ -39,6 +39,8 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
     protected final HashMap<Integer, MessagePacket> sentQueue = new HashMap<>();
     protected int messagesSent = 0;
     
+    protected final LinkedList<UpdateListener> listeners = new LinkedList<>();
+    
     /**
      * Creates a message runner.
      *
@@ -77,6 +79,7 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
         BufferedOutputStream browserOut = null;
         MessagePacket packet;
         
+        int messageNum = -1;
         byte[][] returnMessage;
         ByteBuffer numBuffer = ByteBuffer.allocate(4);
         
@@ -98,18 +101,19 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
                 {
                     try
                     {
-                        packet.returnValue.index = this.messagesSent;
-                        writeMessage(browserOut, this.messagesSent, packet.message);
+                        messageNum = this.messagesSent;
+                        packet.returnValue.index = messageNum;
+                        writeMessage(browserOut, messageNum, packet.message);
                         
                         synchronized (this.sentQueue)
                         {
-                            this.sentQueue.put(this.messagesSent, packet);
+                            this.sentQueue.put(messageNum, packet);
                             this.messagesSent++;
                         }
                     }
                     catch (IOException e)
                     {
-                        logger.error("Could not send message " + this.messagesSent + " " + new String(packet.message, StandardCharsets.UTF_8), e);
+                        logger.error("Could not send message " + messageNum + " " + new String(packet.message, StandardCharsets.UTF_8), e);
                     }
                 }
                 
@@ -118,35 +122,44 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
                  */
                 try
                 {
-                    if (!this.sentQueue.isEmpty())
+                    if (browserIn.available() > 0)
                     {
-                        if (browserIn.available() > 0)
+                        logger.trace("Reading message");
+                        /*
+                         * Wait for a response from the browser.
+                         */
+                        returnMessage = this.readMessage(browserIn);
+                        if (returnMessage == null)
                         {
-                            /*
-                             * Wait for a response from the browser.
-                             */
-                            returnMessage = this.readMessage(browserIn);
-                            if (returnMessage == null)
+                            logger.info("Connection closed.");
+                            break;
+                        }
+                        else
+                        {
+                            numBuffer.clear();
+                            numBuffer.put(returnMessage[0]);
+                            numBuffer.clear();
+                            messageNum = numBuffer.getInt();
+                            if (messageNum == -1)
                             {
-                                logger.info("Connection closed.");
-                                break;
+                                /*
+                                 * Not a response, just a generic update.
+                                 */
+                                Object ob = deserializeObject(returnMessage[1]);
+                                this.triggerUpdateListeners(ob);
+                                logger.debug("Received update {}", ob);
                             }
                             else
                             {
-                                numBuffer.clear();
-                                numBuffer.put(returnMessage[0]);
-                                numBuffer.clear();
-                                packet = this.sentQueue.get(numBuffer.getInt());
+                                packet = this.sentQueue.get(messageNum);
                                 if (packet == null)
                                 {
-                                    numBuffer.clear();
-                                    logger.warn("Received message {} for nonexistant packet", numBuffer.getInt());
+                                    logger.warn("Received message {} for nonexistant packet", messageNum);
                                 }
                                 else
                                 {
                                     packet.returnMessage = returnMessage[1];
-                                    numBuffer.clear();
-                                    logger.debug("Reading message {} {}", numBuffer.getInt(), new String(packet.returnMessage, StandardCharsets.UTF_8));
+                                    logger.debug("Reading message {} {}", messageNum, new String(packet.returnMessage, StandardCharsets.UTF_8));
                                     synchronized (this.readLock)
                                     {
                                         logger.trace("Received message {}, notifying futures.", packet.returnValue.index);
@@ -234,6 +247,48 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
         }
         
         return future;
+    }
+    
+    /**
+     * Adds a listener for when an update not associated with a message comes
+     * through the runner.
+     *
+     * @param listener - The listener to add.
+     */
+    public void addUpdateListener(UpdateListener listener)
+    {
+        this.listeners.add(listener);
+    }
+    
+    /**
+     * Check if an update listener is present.
+     *
+     * @param listener - The listener to check for.
+     * @return Whether the provided listener is present.
+     */
+    public boolean hasUpdateListener(UpdateListener listener)
+    {
+        return this.listeners.contains(listener);
+    }
+    
+    /**
+     * Removes a listener for when an update not associated with a message comes
+     * through the runner.
+     *
+     * @param listener - The listener to remove.
+     */
+    public void removeUpdateListener(UpdateListener listener)
+    {
+        this.listeners.remove(listener);
+    }
+    
+    /**
+     * Triggers update listeners
+     * @param ob - The update that came through.
+     */
+    protected void triggerUpdateListeners(Object ob)
+    {
+        this.listeners.forEach(l -> l.onUpdate(ob, this));
     }
     
     /**

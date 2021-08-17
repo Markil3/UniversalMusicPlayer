@@ -21,6 +21,6 @@
         <Logger name="edu.regis.universeplayer.browserCommands.MessageHandler" level="trace"/>
         <Logger name="edu.regis.universeplayer.browserCommands.memoryMapping.MemoryRunner" level="trace"/>
         <Logger name="edu.regis.universeplayer.browserCommands.memoryMapping.MemoryHandler" level="trace"/>
-        <Logger name="edu.regis.universeplayer.addon.BrowserLink" level="trace"/>
+        <Logger name="BrowserLink" level="trace"/>
     </Loggers>
 </Configuration>

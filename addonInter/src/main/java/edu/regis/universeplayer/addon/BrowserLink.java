@@ -219,7 +219,15 @@ public class BrowserLink extends MessageRunner
         
         if (clazz != null)
         {
-            return gson.fromJson(message, clazz);
+            try
+            {
+                return gson.fromJson(message, clazz);
+            }
+            catch (Exception e)
+            {
+                logger.error("Could not parse " + message, e);
+                throw e;
+            }
         }
         else
         {

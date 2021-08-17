@@ -6,7 +6,7 @@ package edu.regis.universeplayer.player;
 
 import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browser.Browser;
-import edu.regis.universeplayer.browser.InternetSong;
+import edu.regis.universeplayer.data.InternetSong;
 import edu.regis.universeplayer.data.Queue;
 import edu.regis.universeplayer.data.*;
 import edu.regis.universeplayer.localPlayer.LocalPlayer;
@@ -22,9 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedList;
 import java.util.Set;
-import java.util.concurrent.Future;
 
 /**
  * The Interface class serves as the primary GUI that the player interacts with.

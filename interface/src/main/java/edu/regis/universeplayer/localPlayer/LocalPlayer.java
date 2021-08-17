@@ -4,12 +4,14 @@
 package edu.regis.universeplayer.localPlayer;
 
 import com.intervigil.wave.WaveReader;
+import edu.regis.universeplayer.PlaybackInfo;
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
 import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browserCommands.CommandConfirmation;
 import edu.regis.universeplayer.browserCommands.QueryFuture;
 import edu.regis.universeplayer.data.LocalSong;
+import edu.regis.universeplayer.data.PlaybackEvent;
 import edu.regis.universeplayer.data.Song;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -310,7 +312,7 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     public void playing(MediaPlayer mediaPlayer)
     {
         logger.debug("Local player playing.");
-        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackListener.PlaybackInfo(this, this.currentSong, mediaPlayer.status().time(), PlaybackStatus.PLAYING))));
+        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer.status().time(), PlaybackStatus.PLAYING)))));
     }
 
     /**
@@ -322,7 +324,7 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     public void paused(MediaPlayer mediaPlayer)
     {
         logger.debug("Local player paused.");
-        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackListener.PlaybackInfo(this, this.currentSong, mediaPlayer.status().time(), PlaybackStatus.PAUSED))));
+        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer.status().time(), PlaybackStatus.PAUSED)))));
     }
 
     /**
@@ -338,7 +340,7 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     public void stopped(MediaPlayer mediaPlayer)
     {
         logger.debug("Local player stopped prematurely.");
-        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackListener.PlaybackInfo(this, this.currentSong, mediaPlayer.status().time(), PlaybackStatus.STOPPED))));
+        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer.status().time(), PlaybackStatus.STOPPED)))));
     }
 
     /**
@@ -372,7 +374,7 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     public void finished(MediaPlayer mediaPlayer)
     {
         logger.debug("Local player finished.");
-        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackListener.PlaybackInfo(this, this.currentSong, mediaPlayer.status().time(), PlaybackStatus.FINISHED))));
+        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer.status().time(), PlaybackStatus.FINISHED)))));
     }
 
     /**
@@ -384,7 +386,7 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     @Override
     public void timeChanged(MediaPlayer mediaPlayer, long newTime)
     {
-        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackListener.PlaybackInfo(this, this.currentSong, newTime / 1000F, PlaybackStatus.PLAYING))));
+        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, newTime / 1000F, PlaybackStatus.PLAYING)))));
     }
 
     /**

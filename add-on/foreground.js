@@ -34,6 +34,16 @@ function handleMessage(message)
     }
 }
 
+function onStatusUpdate(status, time, songData)
+{
+    sendUpdate({
+        type: "edu.regis.universeplayer.PlaybackInfo",
+        currentSong: songData,
+        status: status,
+        playTime: time
+    });
+}
+
 function sendUpdate(response)
 {
     post = data => background.postMessage({

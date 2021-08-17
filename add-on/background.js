@@ -4,13 +4,20 @@ var numTabMessages = 0;
 /*
 On startup, connect to the "ping_pong" app.
 */
-var port = browser.runtime.connectNative("universalmusic");
+var interfacePort = browser.runtime.connectNative("universalmusic");
 
 var tabPort = null;
 
 function setupTab(port)
 {
-    console.info("Tab " + port.sender.tab.url + " loaded.");
+    if (port.sender)
+    {
+        console.info("Tab " + port.sender.tab.url + " loaded.");
+    }
+    else
+    {
+        console.info("Tab loaded");
+    }
     tabPort = port;
     tabPort.onDisconnect.addListener(e => {
         tabPort = null;
@@ -25,9 +32,21 @@ function setupTab(port)
         browser.tabs.remove(e.sender.tab.id);
     });
     tabPort.onMessage.addListener(message => {
-        if (typeof message == "object" && message.type == "response")
+        if (typeof message == "object")
         {
-            tabMessages.set(message.num, message.data);
+            if (message.type == "response")
+            {
+                tabMessages.set(message.num, message.data);
+            }
+            else if (message.type == "update")
+            {
+                returnValue = {
+                    "messageNum": -1,
+                    "message": message.data
+                }
+                console.trace("Sending update ", returnValue)
+                interfacePort.postMessage(returnValue);
+            }
         }
     });
     return true;
@@ -70,15 +89,20 @@ var listeners = [function (message, returnValue) {
         }
         switch (type)
         {
-        case "CommandSong":
-            returnValue = () => browser.tabs.create({url: message.song}).then(setupTab);
+        case "CommandLoadSong":
+            returnValue = () => {
+                if (message.song)
+                {
+                    browser.tabs.create({url: message.song});
+                }
+            }
             if (tabPort)
             {
                 console.log("Replacing tab");
                 /*
                  * Closes the existing tab first
                  */
-                returnValue = browser.tabs.remove(e.sender.tab.id).then(returnValue);
+                returnValue = browser.tabs.remove(tabPort.sender.tab.id).then(returnValue);
             }
             else
             {
@@ -89,7 +113,7 @@ var listeners = [function (message, returnValue) {
         case "QueryStatus":
             if (!tabPort)
             {
-                returnValue = 4;
+                returnValue = "EMPTY";
                 break;
             }
         case "QueryTime":
@@ -139,6 +163,7 @@ function handleMessage(message)
             {
                 returnValue = listeners[index](message, returnValue);
             }
+            console.debug("Message returned ", returnValue);
             if (returnValue instanceof Promise)
             {
                 returnValue.then(resolve).catch(reject);
@@ -158,7 +183,7 @@ function handleMessage(message)
 /*
  * Listen for messages from the app.
  */
-port.onMessage.addListener((message) => {
+interfacePort.onMessage.addListener((message) => {
     console.log("Received from interface: ", message);
 
     handleMessage(message.message).then((response) => {
@@ -175,9 +200,9 @@ port.onMessage.addListener((message) => {
             }
         }
         console.log("Sending ", returnValue)
-        port.postMessage(returnValue);
+        interfacePort.postMessage(returnValue);
     }).catch(error => {
-
+        console.error("Error in evaluating message: ", error)
     });
 });
 

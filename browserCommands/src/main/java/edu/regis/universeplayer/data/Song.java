@@ -9,7 +9,7 @@ import java.io.Serializable;
 /**
  * Contains data for a song.
  */
-public abstract class Song implements Comparable<Song>, Serializable
+public class Song implements Comparable<Song>, Serializable
 {
     public String title;
     public String[] artists;
