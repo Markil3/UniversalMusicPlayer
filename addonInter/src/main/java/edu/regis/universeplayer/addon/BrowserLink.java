@@ -27,8 +27,16 @@ import java.util.HashMap;
  */
 public class BrowserLink extends MessageRunner
 {
-//    private static final Logger logger = LoggerFactory.getLogger(BrowserLink.class);
-    public static final Gson gson = new Gson();
+    private static final Logger logger = LoggerFactory.getLogger(BrowserLink.class);
+    public static final Gson gson;
+    
+    static
+    {
+        GsonBuilder builder = new GsonBuilder();
+        builder.registerTypeAdapter(StackTraceElement.class, new StackTraceElementSerializer());
+        builder.registerTypeAdapter(Throwable.class, new ThrowableSerializer());
+        gson = builder.create();
+    }
     
     /**
      * Creates a message runner.
@@ -41,8 +49,12 @@ public class BrowserLink extends MessageRunner
     @Override
     public byte[] serializeObject(Object message)
     {
-        String val = gson.toJson(message);
-        return val.getBytes(StandardCharsets.UTF_8);
+        JsonElement val = gson.toJsonTree(message);
+        if (val.isJsonObject())
+        {
+            ((JsonObject) val).addProperty("type", message.getClass().getName());
+        }
+        return val.toString().getBytes(StandardCharsets.UTF_8);
     }
     
     @Override
@@ -197,6 +209,7 @@ public class BrowserLink extends MessageRunner
             try
             {
                 clazz = Class.forName(message.getAsJsonPrimitive("type").getAsString());
+                message.remove("type");
             }
             catch (ClassNotFoundException | ClassCastException e)
             {

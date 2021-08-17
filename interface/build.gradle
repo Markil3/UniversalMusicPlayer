@@ -10,6 +10,9 @@ plugins {
 // In this section you declare where to find the dependencies of your project
 repositories {
     mavenCentral()
+    flatDir {
+        dirs new File(rootDir, 'libs')
+    }
 }
 
 // In this section you declare the dependencies for your production and test code

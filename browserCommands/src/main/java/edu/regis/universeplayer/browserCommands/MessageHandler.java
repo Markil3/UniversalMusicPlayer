@@ -19,20 +19,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 /**
- *
+ * Dispatches messages sent from a corresponding {@link MessageRunner}.
  */
 public class MessageHandler implements Runnable, MessageSerializer
 {
     private final Logger logger;
     
-    private final String name;
+    public final String name;
     
     private final InputStream input;
     private final OutputStream output;
     
     private final ExecutorService executor;
     private final LinkedList<MessageListener> listeners = new LinkedList<>();
-    private final HashMap<Integer, Future<Object>> messageResponses = new HashMap<>();
+    protected final HashMap<Integer, Future<Object>> messageResponses = new HashMap<>();
     
     /**
      * Creates a message handler.
@@ -56,13 +56,21 @@ public class MessageHandler implements Runnable, MessageSerializer
         return logger;
     }
     
+    /**
+     * Called at the beginning of every loop to do extra processing and check to see if we can still run.
+     *
+     * @return True if we should close the runner, false otherwise.
+     */
+    protected boolean onRun()
+    {
+        return false;
+    }
+    
     @Override
     public void run()
     {
         BufferedInputStream browserIn = null;
         BufferedOutputStream browserOut = null;
-        
-        boolean running = true;
         
         byte[][] message;
         byte[] messageByte;
@@ -76,7 +84,7 @@ public class MessageHandler implements Runnable, MessageSerializer
             browserIn = new BufferedInputStream(this.input);
             browserOut = new BufferedOutputStream(this.output);
             
-            while (running)
+            while (!this.onRun())
             {
                 try
                 {
@@ -86,7 +94,7 @@ public class MessageHandler implements Runnable, MessageSerializer
                         if (message == null)
                         {
                             logger.info("Connection closed.");
-                            running = false;
+                            break;
                         }
                         else
                         {

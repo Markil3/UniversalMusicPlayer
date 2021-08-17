@@ -4,7 +4,6 @@
 package edu.regis.universeplayer.localPlayer;
 
 import com.intervigil.wave.WaveReader;
-
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
 import edu.regis.universeplayer.Player;
@@ -12,6 +11,8 @@ import edu.regis.universeplayer.browserCommands.CommandConfirmation;
 import edu.regis.universeplayer.browserCommands.QueryFuture;
 import edu.regis.universeplayer.data.LocalSong;
 import edu.regis.universeplayer.data.Song;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory;
 import uk.co.caprica.vlcj.media.MediaRef;
 import uk.co.caprica.vlcj.media.TrackType;
@@ -19,17 +20,12 @@ import uk.co.caprica.vlcj.player.base.MediaPlayer;
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventListener;
 import uk.co.caprica.vlcj.player.base.StatusApi;
 import uk.co.caprica.vlcj.player.component.AudioPlayerComponent;
-import uk.co.caprica.vlcj.player.component.EmbeddedMediaPlayerComponent;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.LinkedList;
 import java.util.concurrent.*;
 

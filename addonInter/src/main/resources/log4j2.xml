@@ -18,5 +18,9 @@
             <AppenderRef ref="File"/>
         </Root>
         <Logger name="edu.regis.universeplayer.browserCommands.MessageRunner" level="trace"/>
+        <Logger name="edu.regis.universeplayer.browserCommands.MessageHandler" level="trace"/>
+        <Logger name="edu.regis.universeplayer.browserCommands.memoryMapping.MemoryRunner" level="trace"/>
+        <Logger name="edu.regis.universeplayer.browserCommands.memoryMapping.MemoryHandler" level="trace"/>
+        <Logger name="edu.regis.universeplayer.addon.BrowserLink" level="trace"/>
     </Loggers>
 </Configuration>

@@ -12,11 +12,12 @@ import edu.regis.universeplayer.data.Song;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.net.ConnectException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.Scanner;
 import java.util.concurrent.*;
@@ -30,23 +31,19 @@ import java.util.concurrent.*;
 public class Browser extends MessageRunner implements Player<InternetSong>
 {
     private static final Logger logger = LoggerFactory.getLogger(Browser.class);
-    private final Socket socket;
     private final Process process;
+    private final Socket socket;
+    
+    private final LinkedList<PlaybackListener> listeners = new LinkedList<>();
+    
+    private InternetSong currentSong;
     
     public static Browser createBrowser() throws IOException, InterruptedException
     {
-        /*
-         * The maximum number of attempts that will be made to establish a
-         * connection.
-         */
-        final int MAX_ATTEMPTS = 20;
-        /*
-         * How long the thread will sleep between connection attempts, in
-         * milliseconds.
-         */
-        final long SLEEP_TIME = 500;
+        ServerSocket server = new ServerSocket(BrowserConstants.PORT, 50, InetAddress.getByName(null));
+        logger.debug("Server started.");
+        
         int startExit;
-        Socket socket = null;
         Browser browser;
         Process browserProcess = launchBrowser();
         /*
@@ -69,24 +66,31 @@ public class Browser extends MessageRunner implements Player<InternetSong>
         
         ConnectException connErr = null;
         logger.debug("Attempting connection");
-        for (int attempts = 0; socket == null && attempts < MAX_ATTEMPTS; attempts++)
+        Socket socket = server.accept();
+        if (!socket.isBound())
         {
-            try
-            {
-                socket = new Socket(BrowserConstants.IP, BrowserConstants.PORT);
-            }
-            catch (ConnectException e)
-            {
-                connErr = e;
-                logger.debug("Connection attempt {} failed, trying again", attempts);
-                Thread.sleep(SLEEP_TIME);
-            }
+            logger.error("Socket not bound");
         }
-        if (socket == null)
+        else if (!socket.isConnected())
         {
-            throw connErr;
+            logger.error("Socket not connected");
         }
-        logger.debug("Browser connection established.");
+        else if (socket.isClosed())
+        {
+            logger.error("Socket prematurely closed");
+        }
+        else if (socket.isInputShutdown())
+        {
+            logger.error("Socket input prematurely closed.");
+        }
+        else if (socket.isOutputShutdown())
+        {
+            logger.error("Socket input prematurely closed.");
+        }
+        else
+        {
+            logger.debug("Connection established.");
+        }
         browser = new Browser(socket, browserProcess);
         return browser;
     }
@@ -96,6 +100,17 @@ public class Browser extends MessageRunner implements Player<InternetSong>
         super("BrowserRunner", socket.getInputStream(), socket.getOutputStream());
         this.socket = socket;
         this.process = process;
+    }
+    
+    @Override
+    protected boolean onRun()
+    {
+        if (!socket.isConnected() || socket.isClosed() || socket.isInputShutdown() || socket.isOutputShutdown())
+        {
+            logger.debug("Socket closed, shutting down");
+            return true;
+        }
+        return false;
     }
     
     /**
@@ -155,7 +170,7 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     @Override
     public Song getCurrentSong()
     {
-        return null;
+        return this.currentSong;
     }
     
     @Override
@@ -178,23 +193,28 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     @Override
     public QueryFuture<Void> close()
     {
-        if (process != null)
-        {
-            logger.info("Destroying browser processes {}, {}", process, process.descendants().toArray(ProcessHandle[]::new));
-            process.descendants().forEach(ProcessHandle::destroy);
-            process.destroy();
-        }
-        else
-        {
-            logger.info("Process already destroyed.");
-        }
         try
         {
-            this.socket.close();
+            QueryFuture<Void> future = new ForwardedFuture(this.sendObject(new CommandQuit()));
+            return future;
         }
         catch (IOException e)
         {
-            logger.error("Could not close browser socket", e);
+            logger.error("Could not deliver quit command", e);
+            logger.error("Destroying browser processes {}, {}", process, process.descendants().toArray(ProcessHandle[]::new));
+            try
+            {
+                socket.close();
+            }
+            catch (IOException ex)
+            {
+                logger.error("Could not close socket", ex);
+            }
+            finally
+            {
+                process.descendants().forEach(ProcessHandle::destroy);
+                process.destroy();
+            }
         }
         return null;
     }
@@ -236,19 +256,43 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     @Override
     public QueryFuture<Void> play()
     {
-        return null;
+        try
+        {
+            return new ForwardedFuture(this.sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PLAY)));
+        }
+        catch (IOException e)
+        {
+            logger.error("Could not send message", e);
+            return null;
+        }
     }
     
     @Override
     public QueryFuture<Void> pause()
     {
-        return null;
+        try
+        {
+            return new ForwardedFuture(this.sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE)));
+        }
+        catch (IOException e)
+        {
+            logger.error("Could not send message", e);
+            return null;
+        }
     }
     
     @Override
     public QueryFuture<Void> togglePlayback()
     {
-        return null;
+        try
+        {
+            return new ForwardedFuture(this.sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE)));
+        }
+        catch (IOException e)
+        {
+            logger.error("Could not send message", e);
+            return null;
+        }
     }
 
     /**
@@ -263,7 +307,15 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     @Override
     public QueryFuture<Void> seek(float time)
     {
-        return null;
+        try
+        {
+            return new ForwardedFuture(this.sendObject(new CommandSeek(time)));
+        }
+        catch (IOException e)
+        {
+            logger.error("Could not send message", e);
+            return null;
+        }
     }
 
     /**
@@ -274,7 +326,71 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     @Override
     public QueryFuture<PlaybackStatus> getStatus()
     {
-        return null;
+        try
+        {
+            Future future = this.sendObject(new QueryStatus());
+            return new QueryFuture<>() {
+                
+                private CommandReturn<Double> getVal() throws ExecutionException, InterruptedException
+                {
+                    return ((CommandReturn<Double>) future.get());
+                }
+    
+                private CommandReturn<Double> getVal(long timeout, TimeUnit unit) throws ExecutionException, InterruptedException, TimeoutException
+                {
+                    return ((CommandReturn<Double>) future.get(timeout, unit));
+                }
+    
+                @Override
+                public CommandConfirmation getConfirmation() throws CancellationException, ExecutionException, InterruptedException
+                {
+                    return this.getVal().getConfirmation();
+                }
+    
+                @Override
+                public CommandConfirmation getConfirmation(long timeout, TimeUnit unit) throws ExecutionException, InterruptedException, TimeoutException
+                {
+                    return this.getVal(timeout, unit).getConfirmation();
+                }
+    
+                @Override
+                public boolean cancel(boolean mayInterruptIfRunning)
+                {
+                    return future.cancel(mayInterruptIfRunning);
+                }
+    
+                @Override
+                public boolean isCancelled()
+                {
+                    return future.isCancelled();
+                }
+    
+                @Override
+                public boolean isDone()
+                {
+                    return future.isDone();
+                }
+    
+                @Override
+                public PlaybackStatus get() throws InterruptedException, ExecutionException
+                {
+                    Double value = getVal().getReturnValue();
+                    return PlaybackStatus.values()[value.intValue()];
+                }
+    
+                @Override
+                public PlaybackStatus get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
+                {
+                    Double value = getVal(timeout, unit).getReturnValue();
+                    return PlaybackStatus.values()[value.intValue()];
+                }
+            };
+        }
+        catch (IOException e)
+        {
+            logger.error("Could not send message", e);
+            return null;
+        }
     }
     
     @Override

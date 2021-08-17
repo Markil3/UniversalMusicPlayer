@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
@@ -22,23 +21,33 @@ public class Main
     
     public static void main(String[] args) throws IOException, InterruptedException
     {
-        ServerSocket socketSource = null;
-        Socket socket = null;
         MessageHandler interfaceLink;
         BrowserLink browserLink;
         Thread interfaceThread, browserThread;
+        Socket socket;
         try
         {
+            logger.debug("Connecting to browser");
+            browserLink = new BrowserLink("BrowserLink");
             try
             {
-                logger.debug("Connecting to browser");
-                browserLink = new BrowserLink("BrowserLink");
-                logger.debug("Setting up server");
-                socketSource = new ServerSocket(BrowserConstants.PORT);
-                logger.debug("Server started");
-                socket = socketSource.accept();
+                logger.debug("Setting up connection");
+                socket = new Socket(BrowserConstants.IP,BrowserConstants.PORT);
+                logger.debug("Connection established");
+                
+                interfaceLink = new MessageHandler("InterfaceHandler", socket.getInputStream(), socket.getOutputStream()) {
+                    @Override
+                    protected boolean onRun()
+                    {
+                        if (!socket.isConnected() || socket.isClosed() || socket.isInputShutdown() || socket.isOutputShutdown())
+                        {
+                            logger.debug("Socket closed, shutting down");
+                            return true;
+                        }
+                        return false;
+                    }
+                };
                 logger.debug("Connection received");
-                interfaceLink = new MessageHandler("InterfaceHandler", socket.getInputStream(), socket.getOutputStream());
                 /*
                  * Pretty much just forwards any messages to the browser and
                  * returns their value.
@@ -64,6 +73,7 @@ public class Main
             catch (IOException e)
             {
                 logger.error("Could not initialize socket", e);
+                browserLink.sendObject("quit");
                 throw e;
             }
         }
@@ -75,29 +85,6 @@ public class Main
         finally
         {
             logger.debug("Shutting down interface link");
-            if (socket != null)
-            {
-                try
-                {
-                    socket.close();
-                }
-                catch (IOException e)
-                {
-                    logger.error("Could not close socket", e);
-                }
-                finally
-                {
-                    logger.debug("Shutting down server");
-                    try
-                    {
-                        socketSource.close();
-                    }
-                    catch (IOException e)
-                    {
-                        logger.error("Could not close server", e);
-                    }
-                }
-            }
         }
     }
     

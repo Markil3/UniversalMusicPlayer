@@ -12,6 +12,7 @@ import edu.regis.universeplayer.data.Song;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.swing.*;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
@@ -20,8 +21,6 @@ import java.awt.event.MouseEvent;
 import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
-
-import javax.swing.*;
 
 /**
  * This panel contains the buttons necessary for controlling the playback of audio.

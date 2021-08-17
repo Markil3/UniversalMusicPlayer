@@ -24,25 +24,25 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
 {
     private final Logger logger;
     
-    private final String name;
+    public final String name;
     private final InputStream input;
     private final OutputStream output;
-    private final Object readLock = new Object();
+    protected final Object readLock = new Object();
     
     /**
      * This queue serves as a cache for objects we need to send.
      */
-    private final LinkedList<MessagePacket> sendQueue = new LinkedList<>();
+    protected final LinkedList<MessagePacket> sendQueue = new LinkedList<>();
     /**
      * This queue serves as a cache for objects that are waiting for a response.
      */
-    private final HashMap<Integer, MessagePacket> sentQueue = new HashMap<>();
-    private int messagesSent = 0;
+    protected final HashMap<Integer, MessagePacket> sentQueue = new HashMap<>();
+    protected int messagesSent = 0;
     
     /**
      * Creates a message runner.
      *
-     * @param name - The name of the runner. This is used in logging.
+     * @param name   - The name of the runner. This is used in logging.
      * @param input  - The input from our external source.
      * @param output - The output to the external source.
      */
@@ -60,14 +60,22 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
         return logger;
     }
     
+    /**
+     * Called at the beginning of every loop to do extra processing and check to see if we can still run.
+     *
+     * @return True if we should close the runner, false otherwise.
+     */
+    protected boolean onRun()
+    {
+        return false;
+    }
+    
     @Override
     public void run()
     {
         BufferedInputStream browserIn = null;
         BufferedOutputStream browserOut = null;
         MessagePacket packet;
-    
-        boolean running = true;
         
         byte[][] returnMessage;
         ByteBuffer numBuffer = ByteBuffer.allocate(4);
@@ -77,7 +85,7 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
             browserIn = new BufferedInputStream(this.input);
             browserOut = new BufferedOutputStream(this.output);
             
-            while (running)
+            while (!this.onRun())
             {
                 /*
                  * Sends a messages
@@ -121,7 +129,7 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
                             if (returnMessage == null)
                             {
                                 logger.info("Connection closed.");
-                                running = false;
+                                break;
                             }
                             else
                             {
@@ -138,7 +146,7 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
                                 {
                                     packet.returnMessage = returnMessage[1];
                                     numBuffer.clear();
-                                    logger.debug("Reading message {} {}", numBuffer.getInt(), packet.returnMessage);
+                                    logger.debug("Reading message {} {}", numBuffer.getInt(), new String(packet.returnMessage, StandardCharsets.UTF_8));
                                     synchronized (this.readLock)
                                     {
                                         logger.trace("Received message {}, notifying futures.", packet.returnValue.index);
@@ -254,9 +262,9 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
      */
     public class MessageFuture implements Future<Object>
     {
-        private final MessagePacket packetEntry;
-        private int index;
-        private boolean canceled = false;
+        protected final MessagePacket packetEntry;
+        public int index;
+        protected boolean canceled = false;
         
         private MessageFuture(MessagePacket packet)
         {

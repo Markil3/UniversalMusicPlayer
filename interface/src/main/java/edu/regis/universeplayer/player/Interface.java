@@ -6,6 +6,7 @@ package edu.regis.universeplayer.player;
 
 import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browser.Browser;
+import edu.regis.universeplayer.browser.InternetSong;
 import edu.regis.universeplayer.data.Queue;
 import edu.regis.universeplayer.data.*;
 import edu.regis.universeplayer.localPlayer.LocalPlayer;
@@ -36,6 +37,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     private static final Logger logger = LoggerFactory.getLogger(Interface.class);
     
     private static File dataDir;
+    private static File commDir;
     private static File configDir;
     
     /**
@@ -94,29 +96,32 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 inter.players.add(browser = Browser.createBrowser());
                 browserThread = new Thread(browser);
                 browserThread.start();
+                logger.debug("Sending ping");
+                browser.sendObject("ping");
                 Runtime.getRuntime().addShutdownHook(new Thread(browser::close));
+                Player.REGISTERED_PLAYERS.put(InternetSong.class, browser);
                 
-                LinkedList<Future<Object>> pingRequests = new LinkedList<>();
-                for (int i = 0; i < 20; i++)
-                {
-                    logger.info("Sending ping");
-                    pingRequests.add(browser.sendObject("ping"));
-                }
-                
-                LinkedList<Future<Object>> toRemove = new LinkedList<>();
-                while (pingRequests.size() > 0)
-                {
-                    for (Future<Object> future : pingRequests)
-                    {
-                        if (future.isDone())
-                        {
-                            logger.info("Receiving {}", future.get());
-                            toRemove.add(future);
-                        }
-                    }
-                    pingRequests.removeAll(toRemove);
-                    toRemove.clear();
-                }
+//                LinkedList<Future<Object>> pingRequests = new LinkedList<>();
+//                for (int i = 0; i < 20; i++)
+//                {
+//                    logger.info("Sending ping");
+//                    pingRequests.add(browser.sendObject("ping"));
+//                }
+//
+//                LinkedList<Future<Object>> toRemove = new LinkedList<>();
+//                while (pingRequests.size() > 0)
+//                {
+//                    for (Future<Object> future : pingRequests)
+//                    {
+//                        if (future.isDone())
+//                        {
+//                            logger.info("Receiving {}", future.get());
+//                            toRemove.add(future);
+//                        }
+//                    }
+//                    pingRequests.removeAll(toRemove);
+//                    toRemove.clear();
+//                }
             }
             catch (IOException e)
             {
@@ -171,6 +176,33 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             }
         }
         return configDir;
+    }
+    
+    /**
+     * Obtains the directory for memory mapped files
+     * @return The communications storage directory.
+     */
+    public static File getCommDir()
+    {
+        if (commDir == null)
+        {
+            commDir = new File(AppDirsFactory.getInstance().getSharedDir("universalmusic", null, null), "comm");
+            if (!commDir.getParentFile().exists())
+            {
+                if (!commDir.getParentFile().mkdir())
+                {
+                    logger.error("Could not create shared directory {}", commDir.getParent());
+                }
+            }
+            if (!commDir.exists())
+            {
+                if (!commDir.mkdir())
+                {
+                    logger.error("Could not create data directory {}", commDir);
+                }
+            }
+        }
+        return commDir;
     }
     
     /**
