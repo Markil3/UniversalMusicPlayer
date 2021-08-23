@@ -76,13 +76,14 @@ public class MessageHandler implements Runnable, MessageSerializer
         Future<Object> messageResponse;
         ByteBuffer numBuffer = ByteBuffer.allocate(4);
         HashSet<Integer> toRemove = new HashSet<>();
+        boolean running = true;
         
         try
         {
             browserIn = new BufferedInputStream(this.input);
             browserOut = new BufferedOutputStream(this.output);
             
-            while (!this.onRun())
+            while (!this.onRun() && running)
             {
                 try
                 {
@@ -111,6 +112,7 @@ public class MessageHandler implements Runnable, MessageSerializer
                 catch (IOException | ClassNotFoundException e)
                 {
                     logger.error("Could not retrieve message", e);
+                    running = false;
                 }
                 
                 /*
@@ -134,6 +136,7 @@ public class MessageHandler implements Runnable, MessageSerializer
                             catch (IOException e)
                             {
                                 logger.error("Could not send response message for " + responses.getKey(), e);
+                                running = false;
                             }
                         }
                         toRemove.forEach(this.messageResponses::remove);
@@ -158,7 +161,8 @@ public class MessageHandler implements Runnable, MessageSerializer
                             }
                             catch (IOException e)
                             {
-                                logger.error("Could not send response message for " + update, e);
+                                logger.error("Could not send response message for" + update, e);
+                                running = false;
                             }
                         }
                     }
@@ -176,11 +180,13 @@ public class MessageHandler implements Runnable, MessageSerializer
              */
             synchronized (this.messageResponses)
             {
+                logger.debug("Releasing {} dangling messages", this.messageResponses.size());
                 this.messageResponses.values().forEach(future -> future.cancel(false));
             }
             /*
              * Close the streams.
              */
+            logger.debug("Closing streams");
             try
             {
                 if (browserIn != null)
@@ -205,8 +211,19 @@ public class MessageHandler implements Runnable, MessageSerializer
                 {
                     logger.error("Could not close browser output", e1);
                 }
+                finally
+                {
+                    this.onClose();
+                }
             }
         }
+    }
+    
+    /**
+     * Callback for when closing the application.
+     */
+    protected void onClose()
+    {
     }
     
     /**

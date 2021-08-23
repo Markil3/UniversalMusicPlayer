@@ -19,12 +19,12 @@ public class Main
 {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     
-    public static void main(String[] args) throws IOException, InterruptedException
+    public static void main(String[] args) throws IOException
     {
         MessageHandler interfaceLink;
         BrowserLink browserLink;
         Thread interfaceThread, browserThread;
-        Socket socket;
+        Socket socket = null;
         try
         {
             logger.debug("Connecting to browser");
@@ -34,17 +34,37 @@ public class Main
                 logger.debug("Setting up connection");
                 socket = new Socket(BrowserConstants.IP,BrowserConstants.PORT);
                 logger.debug("Connection established");
-                
-                interfaceLink = new MessageHandler("InterfaceHandler", socket.getInputStream(), socket.getOutputStream()) {
+    
+                Socket finalSocket = socket;
+                interfaceLink = new MessageHandler("InterfaceHandler", finalSocket.getInputStream(), finalSocket.getOutputStream()) {
                     @Override
                     protected boolean onRun()
                     {
-                        if (!socket.isConnected() || socket.isClosed() || socket.isInputShutdown() || socket.isOutputShutdown())
+                        if (!finalSocket.isConnected() || finalSocket.isClosed() || finalSocket.isInputShutdown() || finalSocket.isOutputShutdown())
                         {
-                            logger.debug("Socket closed, shutting down");
+                            logger.debug("Interface socket closed, shutting down");
                             return true;
                         }
+                        /**
+                         * Make sure that it is active.
+                         */
+                        this.sendUpdate("ping");
                         return false;
+                    }
+    
+                    @Override
+                    protected void onClose()
+                    {
+                        try
+                        {
+                            logger.debug("Closing interface socket.");
+                            finalSocket.close();
+                            browserLink.sendObject("quit");
+                        }
+                        catch (IOException e)
+                        {
+                            logger.error("Could not close socket", e);
+                        }
                     }
                 };
                 logger.debug("Connection received");
@@ -70,14 +90,28 @@ public class Main
                 browserThread.start();
                 interfaceThread.start();
                 logger.debug("Joining threads.");
-                browserThread.join();
-                interfaceThread.join();
+                try
+                {
+                    browserThread.join();
+                    interfaceThread.join();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Could not wait for threads", e);
+                }
                 logger.debug("Threads completed.");
             }
             catch (IOException e)
             {
                 logger.error("Could not initialize socket", e);
-                browserLink.sendObject("quit");
+                try
+                {
+                    browserLink.sendObject("quit");
+                }
+                catch (IOException ex)
+                {
+                    logger.error("Could not quit socket", ex);
+                }
                 throw e;
             }
         }
@@ -89,6 +123,17 @@ public class Main
         finally
         {
             logger.debug("Shutting down interface link");
+            if (socket != null)
+            {
+                try
+                {
+                    socket.close();
+                }
+                catch (IOException e)
+                {
+                    logger.error("Could not close socket", e);
+                }
+            }
         }
     }
     

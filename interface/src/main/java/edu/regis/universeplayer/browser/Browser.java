@@ -32,11 +32,13 @@ public class Browser extends MessageRunner implements Player<InternetSong>
 {
     private static final Logger logger = LoggerFactory.getLogger(Browser.class);
     private final Process process;
+    private final ServerSocket server;
     private final Socket socket;
     
     private final LinkedList<PlaybackListener> listeners = new LinkedList<>();
     
     private InternetSong currentSong;
+    private boolean running = true;
     
     public static Browser createBrowser() throws IOException, InterruptedException
     {
@@ -91,14 +93,15 @@ public class Browser extends MessageRunner implements Player<InternetSong>
         {
             logger.debug("Connection established.");
         }
-        browser = new Browser(socket, browserProcess);
+        browser = new Browser(socket, server, browserProcess);
         return browser;
     }
     
-    private Browser(Socket socket, Process process) throws IOException
+    private Browser(Socket socket, ServerSocket server, Process process) throws IOException
     {
         super("BrowserRunner", socket.getInputStream(), socket.getOutputStream());
         this.socket = socket;
+        this.server = server;
         this.process = process;
     }
     
@@ -110,7 +113,33 @@ public class Browser extends MessageRunner implements Player<InternetSong>
             logger.debug("Socket closed, shutting down");
             return true;
         }
-        return false;
+        return !this.running;
+    }
+    
+    @Override
+    protected void onClose()
+    {
+        logger.debug("Closing socket");
+        try
+        {
+            this.socket.close();
+        }
+        catch (IOException e)
+        {
+            logger.error("Could not close socket", e);
+        }
+        finally
+        {
+            logger.debug("Closing server");
+            try
+            {
+                this.server.close();
+            }
+            catch (IOException e)
+            {
+                logger.error("Could not close server", e);
+            }
+        }
     }
     
     /**
@@ -193,6 +222,7 @@ public class Browser extends MessageRunner implements Player<InternetSong>
     @Override
     public QueryFuture<Void> close()
     {
+        this.running = false;
         try
         {
             QueryFuture<Void> future = new ForwardedFuture(this.sendObject(new CommandQuit()));

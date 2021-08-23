@@ -187,6 +187,7 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
              */
             synchronized (this.sendQueue)
             {
+                logger.debug("Clearing up {} messages", this.sendQueue.size());
                 while (this.sendQueue.size() > 0)
                 {
                     packet = this.sendQueue.poll();
@@ -200,6 +201,7 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
             /*
              * Close the streams.
              */
+            logger.debug("Closing streams.");
             try
             {
                 if (browserIn != null)
@@ -224,8 +226,19 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
                 {
                     logger.error("Could not close browser output", e1);
                 }
+                finally
+                {
+                    this.onClose();
+                }
             }
         }
+    }
+    
+    /**
+     * Callback for when closing the application.
+     */
+    protected void onClose()
+    {
     }
     
     /**
