@@ -61,7 +61,7 @@ abstract class BuildManifest extends DefaultTask {
             startupScript = files.filter(file -> file.getName().endsWith(".bat")).findFirst().get()
         }
         else if (Os.isFamily(Os.FAMILY_UNIX)) {
-            startupScript = files.filter(file -> !file.getName().endsWith(".bat")).findFirst().get()
+            startupScript = files.filter(file -> !file.getName().endsWith(".sh")).findFirst().get()
         }
         else {
             throw new RuntimeException("Unknown OS family")
@@ -116,5 +116,3 @@ run.dependsOn(installAddon)
 
 // Define the main class for the application
 mainClassName = defaultPackage + '.addon.Main'
-
-compileJava.dependsOn rootProject.bundleAddOn

@@ -6,6 +6,7 @@ package edu.regis.universeplayer.player;
 
 import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browser.Browser;
+import edu.regis.universeplayer.browser.BrowserPlayer;
 import edu.regis.universeplayer.data.InternetSong;
 import edu.regis.universeplayer.data.Queue;
 import edu.regis.universeplayer.data.*;
@@ -74,6 +75,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         Thread browserThread;
         Interface inter = null;
         Browser browser;
+        BrowserPlayer browserPlayer;
         try
         {
             /*
@@ -82,6 +84,11 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
              * otherwise.
              */
             logger.info("Starting application");
+    
+            browser = Browser.createBrowser();
+            browserThread = new Thread(browser);
+            browserThread.start();
+            
             inter = new Interface();
             inter.setSize(700, 500);
             SongProvider.INSTANCE.addUpdateListener(inter);
@@ -91,13 +98,11 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             
             try
             {
-                inter.players.add(browser = Browser.createBrowser());
-                browserThread = new Thread(browser);
-                browserThread.start();
+                inter.players.add(browserPlayer = new BrowserPlayer());
                 logger.debug("Sending ping");
                 browser.sendObject("ping");
-                Runtime.getRuntime().addShutdownHook(new Thread(browser::close));
-                Player.REGISTERED_PLAYERS.put(InternetSong.class, browser);
+                Runtime.getRuntime().addShutdownHook(new Thread(browserPlayer::close));
+                Player.REGISTERED_PLAYERS.put(InternetSong.class, browserPlayer);
                 
 //                LinkedList<Future<Object>> pingRequests = new LinkedList<>();
 //                for (int i = 0; i < 20; i++)

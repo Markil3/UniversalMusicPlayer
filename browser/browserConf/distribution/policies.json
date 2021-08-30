@@ -1,0 +1,37 @@
+{
+  "policies": {
+    "DisableAppUpdate": true,
+    "DisableFeedbackCommands": true,
+    "DisableFirefoxScreenshots": true,
+    "DisableFirefoxStudies": true,
+    "DisablePocket": true,
+    "DisableTelemetry": true,
+    "OverrideFirstRunPage": "about:home",
+    "OverridePostUpdatePage": "about:home",
+    "EnableTrackingProtection": {
+      "Value": true,
+      "Locked": false,
+      "Cryptomining": true,
+      "Fingerprinting": true
+    },
+    "DontCheckDefaultBrowser": true,
+    "Permissions": {
+      "Camera": {
+        "BlockNewRequests": true
+      },
+      "Microphone": {
+        "BlockNewRequests": true
+      },
+      "Location": {
+        "BlockNewRequests": true
+      },
+      "Notifications": {
+        "BlockNewRequests": true
+      },
+      "Autoplay": {
+        "Default": "allow-audio-video",
+        "Locked": true
+      }
+    }
+  }
+}
