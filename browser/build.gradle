@@ -4,9 +4,18 @@
  
 import org.apache.tools.ant.taskdefs.condition.Os
 
+import java.util.stream.Stream
+
 plugins {
     id 'java'
     id "de.undercouch.download" version "4.1.2"
+}
+
+configurations {
+	addon {
+		canBeConsumed = false
+		canBeResolved = true
+	}
 }
 
 // In this section you declare where to find the dependencies of your project
@@ -36,39 +45,21 @@ repositories {
     }
 }
 
-abstract class WriteBat extends DefaultTask {
-	@Input
-    final abstract Property<String> command = project.objects.property(String)
-    @OutputFile
-    final abstract RegularFileProperty outputFile = project.objects.fileProperty().convention(project.layout.buildDirectory.file('install.bat'))
-	
-    @TaskAction
-    void join() {
-        outputFile.get().asFile.text = command.get()
-    }
-}
-
 def firefox_module = "devedition"
 def firefox_revision = "92.0b7"
 
-task bundleAddOn(type: Zip) {
-	setArchiveName "universalmusic@regis.edu.xpi"
-	setDestinationDir file("$rootDir/firefox/distribution/extensions")
-	from (files("$rootDir/add-on"))
+abstract class InstallBrowserTask extends DefaultTask {
+	@OutputFile
+	final abstract DirectoryProperty installation = project.objects.directoryProperty()
 }
 
-task movePolicies(type: Copy) {
-	from files("browserConf")
-	into "$rootDir/firefox/"
-}
-
-task setupProfile {
-	doFirst {
-		mkdir "$rootDir/firefox/distribution"
-		mkdir "$rootDir/firefox/distribution/extensions"
-	}
-	finalizedBy movePolicies
-	finalizedBy bundleAddOn
+dependencies {
+	implementation 'org.slf4j:slf4j-api:1.7.30'
+	implementation 'org.apache.logging.log4j:log4j-api:2.13.3'
+	implementation 'org.apache.logging.log4j:log4j-core:2.13.3'
+	implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.13.3'
+	implementation project(":browserCommands")
+	addon project(path: ":add-on", configuration: 'addonBuild')
 }
 
 task downloadWindows_x86_64(type: Download) {
@@ -102,24 +93,22 @@ task downloadLinux_i686(type: Download) {
 task installWindows_x86_64(dependsOn: downloadWindows_x86_64, type: Exec) {
 	workingDir layout.buildDirectory
 	commandLine 'msiexec', '/i', '"' + downloadWindows_x86_64.dest + '"', '/li', '"install.log"', '/qb', "INSTALL_DIRECTORY_PATH=\"$rootDir\\firefox\"", 'TASKBAR_SHORTCUT=false', 'DESKTOP_SHORTCUT=false', 'INSTALL_MAINTENANCE_SERVICE=false'
-	outputs.file("$rootDir\\firefox\\firefox.exe")
+	it.outputs.dir("$rootDir\\firefox")
 }
 //installWindows_x86_64.onlyIf { !layout.buildDirectory.file("browser/firefox.exe").get().asFile.exists() }
 installWindows_x86_64.doFirst {
 	println "Administrator privileges needed for installing Firefox. Please confirm on the popup."
 }
-installWindows_x86_64.finalizedBy setupProfile
 
 task installWindows_x86(dependsOn: downloadWindows_x86, type: Exec) {
 	workingDir layout.buildDirectory
 	commandLine 'msiexec', '/i', '"' + downloadWindows_x86.dest + '"', '/li', '"install.log"', '/qb', "INSTALL_DIRECTORY_PATH=\"$rootDir/firefox\"", 'TASKBAR_SHORTCUT=false', 'DESKTOP_SHORTCUT=false', 'INSTALL_MAINTENANCE_SERVICE=false'
-	outputs.file("$rootDir\\firefox\\firefox.exe")
+	it.outputs.dir("$rootDir\\firefox")
 }
 //installWindows_x86.onlyIf { !layout.buildDirectory.file("browser/firefox.exe").get().asFile.exists() }
 installWindows_x86.doFirst {
 	println "Administrator privileges needed for installing Firefox. Please confirm on the popup."
 }
-installWindows_x86.finalizedBy setupProfile
 
 task deleteFirefoxWindows(type: Delete) {
 	delete "$rootDir/firefox"
@@ -136,71 +125,117 @@ uninstallFirefoxWindows.doFirst {
 uninstallFirefoxWindows.finalizedBy deleteFirefoxWindows
 
 task installLinux_x86_64(dependsOn: downloadLinux_x86_64, type: Copy) {
-    from tarTree(downloadLinux_x86_64.dest)
+    from(tarTree(downloadLinux_x86_64.dest)) {
+		include "firefox/**"
+		eachFile { fcd ->
+			fcd.relativePath = new RelativePath(true, fcd.relativePath.segments.drop(1))
+		}
+	}
     into "$rootDir/firefox"
+//	outputs.dir(new File(rootDir, "firefox"))
 }
-installLinux_x86_64.finalizedBy setupProfile
 
 task installLinux_i686(dependsOn: downloadLinux_i686, type: Copy) {
-    from tarTree(downloadLinux_i686.dest)
+	from(tarTree(downloadLinux_i686.dest)) {
+		include "firefox/**"
+		eachFile { fcd ->
+			fcd.relativePath = new RelativePath(true, fcd.relativePath.segments.drop(1))
+		}
+	}
 	into "$rootDir/firefox"
+	outputs.dir("$rootDir/firefox")
 }
-installLinux_i686.finalizedBy setupProfile
+
+task installFirefox() {
+	if (Os.isFamily(Os.FAMILY_WINDOWS))
+	{
+		if (Os.isArch("x86_64") || Os.isArch("amd64"))
+		{
+			print("Windows x86_64")
+			dependsOn installWindows_x86_64
+			outputs.dir(installWindows_x86_64.getOutputs())
+		}
+		else if (Os.isArch("x86") || Os.isArch("i386") || Os.isArch("i686"))
+		{
+			print("Windows x86")
+			dependsOn installWindows_x86
+			outputs.dir(installWindows_x86.getOutputs())
+		}
+		else
+		{
+			printf("Unknown windows architecture %s!\n", System.getProperty("os.arch"))
+		}
+	}
+	else if (Os.isFamily(Os.FAMILY_MAC))
+	{
+		print("Mac")
+		processResources.finalizedBy {
+			api "firefox:devedition:92.0b7:mac@dmg"
+		}
+	}
+	else if (Os.isFamily(Os.FAMILY_UNIX))
+	{
+		if (Os.isArch("x86_64") || Os.isArch("amd64"))
+		{
+			dependsOn installLinux_x86_64
+			outputs.dir(installLinux_x86_64.getOutputs().getFiles().getSingleFile())
+		}
+		else if (Os.isArch("x86") || Os.isArch("i386") || Os.isArch("i686"))
+		{
+			dependsOn installLinux_i686
+			outputs.dir(installLinux_i686.getOutputs())
+		}
+		else
+		{
+			printf("Unknown Linux architecture %s!\n", System.getProperty("os.arch"))
+		}
+	}
+	else
+	{
+		printf("Unknown operating system %s!\n", System.getProperty("os.name"))
+	}
+	onlyIf {
+		return !new File(rootDir, 'firefox').isDirectory()
+	}
+}
+
+task setupProfile {
+	dependsOn installFirefox
+	doFirst {
+		for (File file : installFirefox.getOutputs().getFiles().getFiles()) {
+			println file
+		}
+		mkdir "${installFirefox.getOutputs().getFiles().getSingleFile()}/distribution"
+		mkdir "${installFirefox.getOutputs().getFiles().getSingleFile()}/distribution/extensions"
+	}
+	doLast {
+		println "Setting up profile!"
+	}
+}
+
+task movePolicies(type: Copy) {
+	dependsOn setupProfile
+	from files("browserConf")
+	into "$rootDir/firefox/"
+	doLast {
+		println "Making policies firefox!"
+	}
+}
+
+task installAddons(type: Copy) {
+	dependsOn setupProfile
+	dependsOn configurations.addon
+	from configurations.addon.resolve()
+	into "${installFirefox.getOutputs().getFiles().getSingleFile()}/distribution/extensions"
+	doFirst {
+		println "Installing addons!"
+	}
+}
 
 tasks.named('clean') {
 	dependsOn uninstallFirefoxWindows
 }
+println configurations.getNames()
 
-dependencies {
-	implementation 'org.slf4j:slf4j-api:1.7.30'
-	implementation 'org.apache.logging.log4j:log4j-api:2.13.3'
-	implementation 'org.apache.logging.log4j:log4j-core:2.13.3'
-	implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.13.3'
-	implementation project(":browserCommands")
-}
-
-// In this section you declare the dependencies for your production and test code
-if (Os.isFamily(Os.FAMILY_WINDOWS))
-{
-	if (Os.isArch("x86_64") || Os.isArch("amd64"))
-	{
-		print("Windows x86_64")
-		processResources.finalizedBy installWindows_x86_64
-	}
-	else if (Os.isArch("x86") || Os.isArch("i386") || Os.isArch("i686"))
-	{
-		print("Windows x86")
-		processResources.finalizedBy installWindows_x86
-	}
-	else
-	{
-		printf("Unknown windows architecture %s!\n", System.getProperty("os.arch"))
-	}
-}
-else if (Os.isFamily(Os.FAMILY_MAC))
-{
-	print("Mac")
-	processResources.finalizedBy {
-		api "firefox:devedition:92.0b7:mac@dmg"
-	}
-}
-else if (Os.isFamily(Os.FAMILY_UNIX))
-{
-	if (Os.isArch("x86_64") || Os.isArch("amd64"))
-	{
-		processResources.finalizedBy installLinux_x86_64
-	}
-	else if (Os.isArch("x86") || Os.isArch("i386") || Os.isArch("i686"))
-	{
-		processResources.finalizedBy installLinux_i686
-	}
-	else
-	{
-		printf("Unknown Linux architecture %s!\n", System.getProperty("os.arch"))
-	}
-}
-else
-{
-	printf("Unknown operating system %s!\n", System.getProperty("os.name"))
-}
-
+compileJava.dependsOn installAddons
+compileJava.dependsOn movePolicies

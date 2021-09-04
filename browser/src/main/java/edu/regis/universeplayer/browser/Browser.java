@@ -4,8 +4,6 @@
 
 package edu.regis.universeplayer.browser;
 
-import edu.regis.universeplayer.browserCommands.BrowserConstants;
-import edu.regis.universeplayer.browserCommands.MessageRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +15,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import edu.regis.universeplayer.browserCommands.BrowserConstants;
+import edu.regis.universeplayer.browserCommands.MessageRunner;
 
 public class Browser extends MessageRunner
 {
@@ -51,18 +52,21 @@ public class Browser extends MessageRunner
         /*
          * Wait for the browser to fully start.
          */
-        startExit = browserProcess.waitFor();
-        if (startExit != 0)
+        if (!browserProcess.isAlive())
         {
-            logger.error("Error in browser launch (exit code {})", startExit);
-            try (Scanner scanner = new Scanner(browserProcess.getErrorStream()))
+            startExit = browserProcess.exitValue();
+            if (startExit != 0)
             {
-                while (scanner.hasNextLine())
+                logger.error("Error in browser launch (exit code {})", startExit);
+                try (Scanner scanner = new Scanner(browserProcess.getErrorStream()))
                 {
-                    logger.error(scanner.nextLine());
+                    while (scanner.hasNextLine())
+                    {
+                        logger.error(scanner.nextLine());
+                    }
                 }
+                throw new IOException("Error in browser launch (exit code " + startExit + ")");
             }
-            throw new IOException("Error in browser launch (exit code " + startExit + ")");
         }
         logger.debug("Browser started.");
         
@@ -159,8 +163,19 @@ public class Browser extends MessageRunner
         String arch = System.getProperty("os.arch").toLowerCase();
         String args;
         File browserDir = new File(System.getProperty("user.dir"), "firefox");
+        File profileDir = new File(System.getProperty("user.dir"), "profile");
+        profileDir.mkdir();
+        if (!browserDir.isDirectory())
+        {
+            /*
+             * For some reason, the above maps to the interface project module, rather than the root project.
+             */
+            browserDir = new File(new File(System.getProperty("user.dir")).getParent(), "firefox");
+        }
         
-        args = " -profile \"" + System.getProperty("user.dir") + "/profile\"";
+//        args = " -profile \"" + profileDir.getAbsolutePath() + "\"";
+        args = "";
+        System.out.println(profileDir);
         logger.info("Running on {} {}", os, arch);
 //        System.getProperties().entrySet().stream().forEach(entry -> logger.info("{}: {}", entry.getKey(), entry.getValue()));
         if (os.contains("windows"))

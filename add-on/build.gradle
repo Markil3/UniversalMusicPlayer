@@ -1,0 +1,49 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
+import java.util.stream.Stream
+
+configurations {
+    addonBuild {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+    nativeApp {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
+
+/**
+ * Contains information on the extension being made
+ */
+interface ExtensionData {
+    Property<String> getName()
+    Property<String> getDescription()
+    Property<String> getId()
+}
+
+def extension = project.extensions.create('extension', ExtensionData)
+extension.name = "universalmusic"
+extension.description = "A link between the Universal Music Player and the web browser."
+extension.id = "universalmusic@regis.edu"
+
+/**
+ * Creates a packaged (albiet unsigned) Firefox addon from the src/main directory.
+ */
+tasks.register('zipAddon', Zip) {
+    archiveName = "${extension.id.get()}.xpi"
+    destinationDir = file("$buildDir/lib")
+    from("$projectDir/src/addon/javascript", "$projectDir/src/addon/resources")
+}
+
+tasks.register("clean", Delete) {
+    delete "$buildDir"
+    followSymlinks = false
+}
+
+artifacts {
+    addonBuild(zipAddon)
+}

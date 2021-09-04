@@ -1,20 +1,25 @@
-/*
- * Copyright (c) 2021 William Hubbard. All Rights Reserved.
- */
-
-
-import java.nio.file.CopyOption
-import java.nio.file.Files
-import java.nio.file.Path
 import org.apache.tools.ant.taskdefs.condition.Os
 
+import java.lang.reflect.Method
+import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.util.stream.Stream
 
+/*
+ * Copyright (c) 2021 William Hubbard. All Rights Reserved.
+ */
 plugins {
     id 'java'
     id 'application'
+//    id 'regis.browser-addon'
+}
+
+configurations {
+    addon {
+        canBeConsumed = false
+        canBeResolved = true
+    }
 }
 
 // In this section you declare where to find the dependencies of your project
@@ -22,6 +27,84 @@ repositories {
     mavenCentral()
     flatDir {
         dirs new File(rootDir, 'libs')
+    }
+}
+
+/**
+ * Creates an addon manifest for running
+ */
+abstract class BuildManifest extends DefaultTask {
+    @InputDirectory
+    final abstract DirectoryProperty inputFile = project.objects.directoryProperty()
+    @OutputDirectory
+    final abstract DirectoryProperty manifestDir = project.objects.directoryProperty().convention(project.layout.buildDirectory.dir("manifests"))
+    @OutputFiles
+    final abstract FileCollection manifests = project.objects.fileCollection()
+
+    @TaskAction
+    void join() {
+        manifestDir.get().asFile.mkdir()
+        println "Making build directories!"
+        String addonName, addonDescription, extensionId
+        File manifest
+        File startupScript
+        File binFiles = new File(inputFile.get().asFile, "bin")
+        Stream<File> files = Arrays.stream(binFiles.listFiles())
+        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+            startupScript = files.filter(file -> file.getName().endsWith(".bat")).findFirst().get()
+        } else if (Os.isFamily(Os.FAMILY_UNIX)) {
+            startupScript = files.filter(file -> !file.getName().endsWith(".sh")).findFirst().get()
+        } else {
+            throw new RuntimeException("Unknown OS family")
+        }
+        HashSet<File> manifestSet = new HashSet<>()
+        for (Dependency dep : project.configurations.addon.dependencies) {
+            addonName = dep.dependencyProject.extension.name.get()
+            addonDescription = dep.dependencyProject.extension.description.get()
+            extensionId = dep.dependencyProject.extension.id.get()
+            manifest = manifestDir.get().file("${addonName}.json").asFile
+            manifest.createNewFile()
+            println manifest
+            manifest.text = "{\n" +
+                    "  \"name\": \"$addonName\",\n" +
+                    "  \"description\": \"$addonDescription\",\n" +
+                    "  \"path\": \"" + startupScript.getAbsolutePath().replace("\\", "\\\\") + "\",\n" +
+                    "  \"type\": \"stdio\",\n" +
+                    "  \"allowed_extensions\": [\"$extensionId\"]\n" +
+                    "}"
+            manifestSet.add(manifest)
+        }
+        manifests.setFrom(manifestSet)
+        println manifests.files
+    }
+}
+
+/**
+ *
+ */
+abstract class InstallAddon extends DefaultTask {
+    @InputDirectory
+    final abstract DirectoryProperty inputFile = project.objects.directoryProperty()
+
+    @TaskAction
+    void join() {
+//        File file = inputFile.get().asFile
+        for (File file: inputFile.asFileTree) {
+            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                String name = file.name.substring(0, file.name.lastIndexOf('.'))
+                Process p = Runtime.getRuntime()
+                        .exec("REG DELETE HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\${name} /f ")
+                p.waitFor()
+                p = Runtime.getRuntime()
+                        .exec("REG ADD HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\${name} /ve /d \""
+                                + file.getAbsolutePath() + "\" /f ")
+                p.waitFor()
+            } else if (Os.isFamily(Os.FAMILY_MAC)) {
+                Files.copy(file.toPath(), Paths.get(System.getProperty("user.home"), "Library/Application Support/Mozilla/NativeMessagingHosts", file.getName()), StandardCopyOption.REPLACE_EXISTING)
+            } else if (Os.isFamily(Os.FAMILY_UNIX)) {
+                Files.copy(file.toPath(), Paths.get(System.getProperty("user.home"), ".mozilla/native-messaging-hosts", file.getName()), StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
     }
 }
 
@@ -43,76 +126,19 @@ dependencies {
     // testCompile dependency to testCompile 'org.testng:testng:6.8.1' and add
     // 'test.useTestNG()' to your build script.
     testImplementation 'junit:junit:4.12'
+
+    addon(project(":add-on"))
 }
 
-abstract class BuildManifest extends DefaultTask {
-    @InputDirectory
-    final abstract DirectoryProperty inputFile = project.objects.directoryProperty()
-    @OutputFile
-    final abstract RegularFileProperty outputFile = project.objects.fileProperty().convention(project.layout.buildDirectory.file("universalmusic.json"))
-
-    @TaskAction
-    void join() {
-        File startupScript
-        File binFiles = new File(inputFile.get().asFile, "bin")
-        print binFiles
-        Stream<File> files = Arrays.stream(binFiles.listFiles())
-        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-            startupScript = files.filter(file -> file.getName().endsWith(".bat")).findFirst().get()
-        }
-        else if (Os.isFamily(Os.FAMILY_UNIX)) {
-            startupScript = files.filter(file -> !file.getName().endsWith(".sh")).findFirst().get()
-        }
-        else {
-            throw new RuntimeException("Unknown OS family")
-        }
-        outputFile.get().asFile.text = "{\n" +
-                "  \"name\": \"universalmusic\",\n" +
-                "  \"description\": \"A link between the Universal Music Player and the web browser.\",\n" +
-                "  \"path\": \"" + startupScript.getAbsolutePath().replace("\\", "\\\\") + "\",\n" +
-                "  \"type\": \"stdio\",\n" +
-                "  \"allowed_extensions\": [\"universalmusic@regis.edu\"]\n" +
-                "}"
-    }
+tasks.register('buildManifest', BuildManifest) {
+    dependsOn installDist
+    inputFile = installDist.outputs.getFiles().getSingleFile()
 }
 
-TaskProvider<BuildManifest> buildManifestP = tasks.register("buildManifest", BuildManifest) {
-    inputFile = tasks.named("installDist", Sync).get().destinationDir
+tasks.register('installAddon', InstallAddon) {
+    inputFile = buildManifest.manifestDir
 }
-
-buildManifest.dependsOn(installDist)
-
-abstract class InstallAddon extends DefaultTask {
-    @InputFile
-    final abstract RegularFileProperty inputFile = project.objects.fileProperty()
-
-    @TaskAction
-    void join() {
-        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-            Process p = Runtime.getRuntime()
-                    .exec("REG DELETE HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\universalmusic /f ")
-            p.waitFor()
-            p = Runtime.getRuntime()
-                    .exec("REG ADD HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\universalmusic /ve /d \""
-                            + inputFile.get().asFile.getAbsolutePath() + "\" /f ")
-            p.waitFor()
-        }
-        else if (Os.isFamily(Os.FAMILY_MAC)) {
-            Files.copy(inputFile.get().asFile.toPath(), Paths.get(System.getProperty("user.home"), "Library/Application Support/Mozilla/NativeMessagingHosts", inputFile.get().asFile.getName()))
-        }
-        else if (Os.isFamily(Os.FAMILY_UNIX)) {
-            Files.copy(inputFile.get().asFile.toPath(), Paths.get(System.getProperty("user.home"), ".mozilla/native-messaging-hosts", inputFile.get().asFile.getName()))
-        }
-    }
-}
-
-TaskProvider<InstallAddon> installAddonP = tasks.register("installAddon", InstallAddon) {
-    inputFile = buildManifestP.get().outputFile
-}
-
-installAddon.dependsOn(buildManifest)
-
-run.dependsOn(installAddon)
+assemble.dependsOn(installAddon)
 
 // Define the main class for the application
 mainClassName = defaultPackage + '.addon.Main'

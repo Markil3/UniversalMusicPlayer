@@ -46,5 +46,3 @@ targetCompatibility = JavaVersion.VERSION_16
 // Define the main class for the application
 mainClassName = defaultPackage + '.player.Interface'
 //mainClassName = defaultPackage + '.localPlayer.Player'
-
-compileJava.dependsOn ':addonInter:installAddon'
