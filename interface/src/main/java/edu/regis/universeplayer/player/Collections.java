@@ -9,12 +9,11 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
+import java.util.Locale;
+import java.util.ResourceBundle;
 
 import javax.swing.*;
-import javax.swing.border.LineBorder;
-import javax.swing.plaf.LabelUI;
 
-import edu.regis.universeplayer.ClickListener;
 import edu.regis.universeplayer.data.CollectionType;
 import edu.regis.universeplayer.data.Song;
 import edu.regis.universeplayer.data.SongProvider;
@@ -27,6 +26,8 @@ import edu.regis.universeplayer.data.SongProvider;
  */
 public class Collections extends JPanel
 {
+    private static final ResourceBundle langs = ResourceBundle.getBundle("lang.interface", Locale.getDefault());
+
     /**
      * A list of all things interested in knowing when we click a collection.
      */
@@ -44,35 +45,35 @@ public class Collections extends JPanel
         this.setFocusable(true);
         this.setFocusCycleRoot(true);
         
-        this.add(defaultLabel = label = this.createButton("All Songs"));
+        this.add(defaultLabel = label = this.createButton(langs.getString("collections.all")));
         label.setMnemonic('A');
         label.addActionListener(mouseEvent -> this
                 .triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE.getSongs())));
-        this.add(label = this.createButton("Artists"));
+        this.add(label = this.createButton(langs.getString("collections.artists")));
         label.setMnemonic('T');
         label.addActionListener(mouseEvent -> this
                 .triggerCollectionDisplayListeners(CollectionType.albumArtist, SongProvider.INSTANCE
                         .getAlbumArtists()));
-        this.add(label = this.createButton("Albums"));
+        this.add(label = this.createButton(langs.getString("collections.albums")));
         label.setMnemonic('B');
         label.addActionListener(mouseEvent -> this
                 .triggerCollectionDisplayListeners(CollectionType.album, SongProvider.INSTANCE
                         .getAlbums()));
-        this.add(label = this.createButton("Genres"));
+        this.add(label = this.createButton(langs.getString("collections.genres")));
         label.setMnemonic('G');
         label.addActionListener(mouseEvent -> this
                 .triggerCollectionDisplayListeners(CollectionType.genre, SongProvider.INSTANCE
                         .getGenres()));
-        this.add(label = this.createButton("Years"));
+        this.add(label = this.createButton(langs.getString("collections.years")));
         label.setMnemonic('Y');
         label.addActionListener(mouseEvent -> this
                 .triggerCollectionDisplayListeners(CollectionType.year, SongProvider.INSTANCE
                         .getYears()));
         this.add(new JLabel("\u23AF".repeat(6)));
-        this.add(label = this.createButton("Playlists"));
+        this.add(label = this.createButton(langs.getString("collections.playlists")));
         label.setMnemonic('P');
         this.add(new JLabel("\u23AF".repeat(6)));
-        this.add(label = this.createButton("Add External Song"));
+        this.add(label = this.createButton(langs.getString("actions.external.add.title")));
         label.setMnemonic('E');
         label.addActionListener(mouseEvent -> this.addNewSong());
         

@@ -23,6 +23,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Locale;
+import java.util.ResourceBundle;
 import java.util.Set;
 
 /**
@@ -33,7 +35,11 @@ import java.util.Set;
  */
 public class Interface extends JFrame implements SongDisplayListener, ComponentListener, WindowListener, UpdateListener, FocusListener
 {
+//    static {
+//        Locale.setDefault(new Locale("es", "ES"));
+//    }
     private static final Logger logger = LoggerFactory.getLogger(Interface.class);
+    private static final ResourceBundle langs = ResourceBundle.getBundle("lang.interface", Locale.getDefault());
     
     private static File dataDir;
     private static File commDir;
@@ -129,13 +135,13 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             catch (IOException e)
             {
                 logger.error("Could not open browser background", e);
-                JOptionPane.showMessageDialog(inter, e, "Could not open browser background", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(inter, e, langs.getString("error.browser.launch"), JOptionPane.ERROR_MESSAGE);
             }
         }
         catch (Throwable e)
         {
             logger.error("Could not open browser background", e);
-            JOptionPane.showMessageDialog(inter != null && inter.isVisible() ? inter : null, e, "Error!", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(inter != null && inter.isVisible() ? inter : null, e, langs.getString("error.generic"), JOptionPane.ERROR_MESSAGE);
         }
     }
     
@@ -215,7 +221,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     {
         super();
         
-        this.setTitle("Universal Music Player");
+        this.setTitle(langs.getString("title"));
         this.getContentPane().setLayout(new BorderLayout());
         this.setFocusable(true);
         this.setFocusCycleRoot(true);

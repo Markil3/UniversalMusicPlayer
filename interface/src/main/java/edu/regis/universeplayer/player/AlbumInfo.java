@@ -12,12 +12,16 @@ import edu.regis.universeplayer.data.Album;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.ResourceBundle;
 
 /**
  * This panel will display information on an album.
  */
 public class AlbumInfo extends JButton
 {
+    private static final ResourceBundle langs = ResourceBundle.getBundle("lang.interface", Locale.getDefault());
+
     public Album album;
     public final JLabel artLabel;
     public final JLabel albumName;
@@ -38,13 +42,13 @@ public class AlbumInfo extends JButton
         
         this.artLabel = new JLabel();
         this.add(this.artLabel);
-        this.albumName = new JLabel("Album");
+        this.albumName = new JLabel(langs.getString("albumInfo.album"));
         this.add(this.albumName);
-        this.artists = new JLabel("Artists");
+        this.artists = new JLabel(langs.getString("albumInfo.artists"));
         this.add(this.artists);
-        this.genres = new JLabel("Genres");
+        this.genres = new JLabel(langs.getString("albumInfo.genres"));
         this.add(this.genres);
-        this.year = new JLabel("20XX");
+        this.year = new JLabel(langs.getString("albumInfo.year"));
         this.add(this.year);
         
         /*

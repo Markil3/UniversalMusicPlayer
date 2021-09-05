@@ -17,10 +17,13 @@ import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.event.MouseEvent;
 import java.util.Formatter;
+import java.util.Locale;
+import java.util.ResourceBundle;
 
 public class QueueList extends JPanel implements Queue.SongChangeListener, Queue.QueueChangeListener
 {
     private static final Logger logger = LoggerFactory.getLogger(QueueList.class);
+    private static final ResourceBundle langs = ResourceBundle.getBundle("lang.interface", Locale.getDefault());
     
     final JPanel header;
     final ScrollablePanel songList;
@@ -42,8 +45,8 @@ public class QueueList extends JPanel implements Queue.SongChangeListener, Queue
         c.gridx = 0;
         c.gridy = 0;
         c.gridwidth = 1;
-        header.add(new JLabel(" ".repeat(20) + "Queue" + " ".repeat(20)), c);
-        this.clearButton = new JButton("Clear");
+        header.add(new JLabel(" ".repeat(20) + langs.getString("interface.queue.title") + " ".repeat(20)), c);
+        this.clearButton = new JButton(langs.getString("actions.clear"));
         this.clearButton.addActionListener(e -> Queue.getInstance().clear());
         c.gridy = 1;
         c.gridwidth = 1;
@@ -229,8 +232,8 @@ public class QueueList extends JPanel implements Queue.SongChangeListener, Queue
     {
         public SongMenu(Song song, Queue queue)
         {
-            final JMenuItem play = new JMenuItem("Play");
-            final JMenuItem remove = new JMenuItem("Remove");
+            final JMenuItem play = new JMenuItem(langs.getString("actions.play"));
+            final JMenuItem remove = new JMenuItem(langs.getString("actions.remove"));
             
             play.addActionListener(e -> queue.skipToSong(queue.indexOf(song)));
             remove.addActionListener(e -> queue.remove(song));

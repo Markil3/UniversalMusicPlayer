@@ -15,6 +15,8 @@ import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Locale;
+import java.util.ResourceBundle;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -24,6 +26,7 @@ import java.util.concurrent.Future;
 public class InternetSongDialog extends JDialog
 {
     private static final Logger logger = LoggerFactory.getLogger(InternetSongDialog.class);
+    private static final ResourceBundle langs = ResourceBundle.getBundle("lang.interface", Locale.getDefault());
     
     private final JTextField urlBox;
     private final JTextField titleBox;
@@ -48,7 +51,7 @@ public class InternetSongDialog extends JDialog
         c.anchor = GridBagConstraints.WEST;
         c.insets = new Insets(0, 2, 5, 2);
         
-        this.getContentPane().add(label = new JLabel("URL"), c);
+        this.getContentPane().add(label = new JLabel(langs.getString("actions.external.add.url")), c);
         this.urlBox = new JTextField();
         this.urlBox.addFocusListener(new FocusAdapter()
         {
@@ -73,7 +76,7 @@ public class InternetSongDialog extends JDialog
     
         c.gridx = 0;
         c.gridy = ++y;
-        this.getContentPane().add(label = new JLabel("Song Title"), c);
+        this.getContentPane().add(label = new JLabel(langs.getString("actions.external.add.song")), c);
         this.titleBox = new JTextField();
         c.gridy = ++y;
         this.getContentPane().add(this.titleBox, c);
@@ -81,7 +84,7 @@ public class InternetSongDialog extends JDialog
     
         c.gridx = 0;
         c.gridy = ++y;
-        this.getContentPane().add(label = new JLabel("Album"), c);
+        this.getContentPane().add(label = new JLabel(langs.getString("actions.external.add.album")), c);
         this.albumBox = new JTextField();
         c.gridy = ++y;
         this.getContentPane().add(this.albumBox, c);
@@ -89,7 +92,7 @@ public class InternetSongDialog extends JDialog
     
         c.gridx = 0;
         c.gridy = ++y;
-        this.getContentPane().add(label = new JLabel("Artists"), c);
+        this.getContentPane().add(label = new JLabel(langs.getString("actions.external.add.artists")), c);
         this.artistBox = new JTextField();
         c.gridy = ++y;
         this.getContentPane().add(this.artistBox, c);
@@ -97,7 +100,7 @@ public class InternetSongDialog extends JDialog
     
         c.gridx = 0;
         c.gridy = ++y;
-        this.getContentPane().add(label = new JLabel("Genre"), c);
+        this.getContentPane().add(label = new JLabel(langs.getString("actions.external.add.genre")), c);
         this.genreBox = new JTextField();
         c.gridy = ++y;
         this.getContentPane().add(this.genreBox, c);
@@ -106,11 +109,11 @@ public class InternetSongDialog extends JDialog
         c.gridwidth = 1;
         c.gridx = 0;
         c.gridy = ++y;
-        JButton cancelButton = new JButton("Cancel");
+        JButton cancelButton = new JButton(langs.getString("actions.cancel"));
         cancelButton.addActionListener(e -> this.dispose());
         this.getContentPane().add(cancelButton, c);
         c.gridx = 1;
-        JButton addButton = new JButton("Add");
+        JButton addButton = new JButton(langs.getString("actions.add"));
         addButton.addActionListener(e -> this.confirm());
         this.getContentPane().add(addButton, c);
         
@@ -151,7 +154,7 @@ public class InternetSongDialog extends JDialog
             catch (InterruptedException | ExecutionException e)
             {
                 logger.error("Could not evaluate song", e);
-                JOptionPane.showMessageDialog(InternetSongDialog.this, e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(InternetSongDialog.this, e.getMessage(), langs.getString("error.generic"), JOptionPane.ERROR_MESSAGE);
             }
             finally
             {
