@@ -2,7 +2,7 @@
 <!--
   ~ Copyright (c) 2021 William Hubbard. All Rights Reserved.
   -->
-<Configuration status="WARN">
+<Configuration packages="edu.regis.universeplayer" status="WARN">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout pattern="%c:%L %-5level - %msg%n"/>
@@ -12,10 +12,17 @@
                 <Pattern>%d{HH:mm:ss.SSS} - %c.%M(%F:%L) - %-5level - %msg%n</Pattern>
             </PatternLayout>
         </File>
+        <List name="List"/>
+        <Async name="Async">
+            <AppenderRef ref="File"/>
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="List"/>
+        </Async>
     </Appenders>
     <Loggers>
         <Root level="debug">
-            <AppenderRef ref="File"/>
+            <AppenderRef ref="Async"/>
         </Root>
+        <Logger name="BrowserRunner" level="info"/>
     </Loggers>
 </Configuration>

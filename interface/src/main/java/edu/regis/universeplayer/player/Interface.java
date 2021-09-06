@@ -323,10 +323,14 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             {
                 if (this.isEnabled())
                 {
-
+                    LogWindow logs = new LogWindow();
+                    logs.pack();
+                    logs.setSize(600, 400);
+                    logs.setVisible(true);
                 }
             }
         });
+        action.putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_F12, 0));
 
         this.actions.put("about", action = new AbstractAction(langs.getString("actions.about"))
         {
