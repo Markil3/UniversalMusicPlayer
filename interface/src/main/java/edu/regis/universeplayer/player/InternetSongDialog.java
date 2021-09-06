@@ -51,7 +51,7 @@ public class InternetSongDialog extends JDialog
         c.anchor = GridBagConstraints.WEST;
         c.insets = new Insets(0, 2, 5, 2);
         
-        this.getContentPane().add(label = new JLabel(langs.getString("actions.external.add.url")), c);
+        this.getContentPane().add(label = new JLabel(langs.getString("actions.addExternal.url")), c);
         this.urlBox = new JTextField();
         this.urlBox.addFocusListener(new FocusAdapter()
         {
@@ -76,7 +76,7 @@ public class InternetSongDialog extends JDialog
     
         c.gridx = 0;
         c.gridy = ++y;
-        this.getContentPane().add(label = new JLabel(langs.getString("actions.external.add.song")), c);
+        this.getContentPane().add(label = new JLabel(langs.getString("actions.addExternal.song")), c);
         this.titleBox = new JTextField();
         c.gridy = ++y;
         this.getContentPane().add(this.titleBox, c);
@@ -84,7 +84,7 @@ public class InternetSongDialog extends JDialog
     
         c.gridx = 0;
         c.gridy = ++y;
-        this.getContentPane().add(label = new JLabel(langs.getString("actions.external.add.album")), c);
+        this.getContentPane().add(label = new JLabel(langs.getString("actions.addExternal.album")), c);
         this.albumBox = new JTextField();
         c.gridy = ++y;
         this.getContentPane().add(this.albumBox, c);
@@ -92,7 +92,7 @@ public class InternetSongDialog extends JDialog
     
         c.gridx = 0;
         c.gridy = ++y;
-        this.getContentPane().add(label = new JLabel(langs.getString("actions.external.add.artists")), c);
+        this.getContentPane().add(label = new JLabel(langs.getString("actions.addExternal.artists")), c);
         this.artistBox = new JTextField();
         c.gridy = ++y;
         this.getContentPane().add(this.artistBox, c);
@@ -100,7 +100,7 @@ public class InternetSongDialog extends JDialog
     
         c.gridx = 0;
         c.gridy = ++y;
-        this.getContentPane().add(label = new JLabel(langs.getString("actions.external.add.genre")), c);
+        this.getContentPane().add(label = new JLabel(langs.getString("actions.addExternal.genre")), c);
         this.genreBox = new JTextField();
         c.gridy = ++y;
         this.getContentPane().add(this.genreBox, c);

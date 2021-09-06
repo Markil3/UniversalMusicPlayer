@@ -72,31 +72,31 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
         buttonCont = new JPanel(buttonLayout);
         this.add(buttonCont);
         
-        this.prevButton = new JButton();
+        this.prevButton = new JButton(Interface.getInstance().actions.get("playback.skipPrev"));
+        this.prevButton.setText("");
         icon = new ImageIcon(this.getClass()
                 .getResource("/gui/icons/skipPrev.png"), "Previous Button");
         icon.setImage(icon.getImage().getScaledInstance(ICON_SIZE.width, ICON_SIZE.height, 0));
         this.prevButton.setIcon(icon);
         this.prevButton.setPreferredSize(BUTTON_SIZE);
-        this.prevButton.addActionListener(actionEvent -> this.previousSong());
         buttonCont.add(this.prevButton);
         
-        this.playButton = new JButton();
+        this.playButton = new JButton(Interface.getInstance().actions.get("playback.toggle"));
+        this.playButton.setText("");
         PAUSE_ICON = icon = new ImageIcon(this.getClass().getResource("/gui/icons/pause.png"), "Pause Button");
         icon.setImage(icon.getImage().getScaledInstance(ICON_SIZE.width, ICON_SIZE.height, 0));
         PLAY_ICON = icon = new ImageIcon(this.getClass().getResource("/gui/icons/play.png"), "Play Button");
         icon.setImage(icon.getImage().getScaledInstance(ICON_SIZE.width, ICON_SIZE.height, 0));
         this.playButton.setIcon(icon);
         this.playButton.setPreferredSize(BUTTON_SIZE);
-        this.playButton.addActionListener(actionEvent -> this.togglePlayback());
         buttonCont.add(this.playButton);
         
-        this.nextButton = new JButton();
+        this.nextButton = new JButton(Interface.getInstance().actions.get("playback.skipNext"));
+        this.nextButton.setText("");
         icon = new ImageIcon(this.getClass().getResource("/gui/icons/skipNext.png"), "Next Button");
         icon.setImage(icon.getImage().getScaledInstance(ICON_SIZE.width, ICON_SIZE.height, 0));
         this.nextButton.setIcon(icon);
         this.nextButton.setPreferredSize(BUTTON_SIZE);
-        this.nextButton.addActionListener(actionEvent -> this.nextSong());
         buttonCont.add(this.nextButton);
         
         progressLayout = new SpringLayout();
@@ -171,11 +171,66 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
         });
         this.triggerCommandListeners(PlaybackCommand.SEEK, value);
     }
+
+    protected void play()
+    {
+        this.service.execute(() -> {
+            try
+            {
+                if (this.currentPlayer != null)
+                {
+                    switch ((PlaybackStatus) this.currentPlayer.getStatus().get())
+                    {
+                    case PAUSED -> this.currentPlayer.play();
+                    case STOPPED, EMPTY -> {
+                        if (Queue.getInstance().size() > 0)
+                        {
+                            if (Queue.getInstance().getCurrentSong() == null)
+                            {
+                                Queue.getInstance().skipToSong(0);
+                            }
+                            else
+                            {
+                                this.currentPlayer.play();
+                            }
+                        }
+                    }
+                    }
+                }
+            }
+            catch (ExecutionException | InterruptedException e)
+            {
+                logger.error("Could not get current playback status", e);
+            }
+        });
+        this.triggerCommandListeners(PlaybackCommand.PLAY, null);
+    }
+
+    protected void pause()
+    {
+        this.service.execute(() -> {
+            try
+            {
+                if (this.currentPlayer != null)
+                {
+                    switch ((PlaybackStatus) this.currentPlayer.getStatus().get())
+                    {
+                    case PLAYING -> this.currentPlayer.pause();
+                    }
+                }
+            }
+            catch (ExecutionException | InterruptedException e)
+            {
+                logger.error("Could not get current playback status", e);
+            }
+        });
+        this.triggerCommandListeners(PlaybackCommand.PAUSE, null);
+    }
     
     /**
      * Toggles the playback of the current song.
      */
-    private void togglePlayback()
+    protected void togglePlayback()
     {
         this.service.execute(() -> {
             try
@@ -213,7 +268,7 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
     /**
      * Skips to the next song.
      */
-    private void previousSong()
+    protected void previousSong()
     {
         Queue.getInstance().skipPrev();
         this.triggerCommandListeners(PlaybackCommand.PREVIOUS, null);
@@ -222,7 +277,7 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
     /**
      * Skips to the next song.
      */
-    private void nextSong()
+    protected void nextSong()
     {
         Queue.getInstance().skipNext();
         this.triggerCommandListeners(PlaybackCommand.NEXT, null);

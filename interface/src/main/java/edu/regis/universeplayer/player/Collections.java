@@ -45,37 +45,15 @@ public class Collections extends JPanel
         this.setFocusable(true);
         this.setFocusCycleRoot(true);
         
-        this.add(defaultLabel = label = this.createButton(langs.getString("collections.all")));
-        label.setMnemonic('A');
-        label.addActionListener(mouseEvent -> this
-                .triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE.getSongs())));
-        this.add(label = this.createButton(langs.getString("collections.artists")));
-        label.setMnemonic('T');
-        label.addActionListener(mouseEvent -> this
-                .triggerCollectionDisplayListeners(CollectionType.albumArtist, SongProvider.INSTANCE
-                        .getAlbumArtists()));
-        this.add(label = this.createButton(langs.getString("collections.albums")));
-        label.setMnemonic('B');
-        label.addActionListener(mouseEvent -> this
-                .triggerCollectionDisplayListeners(CollectionType.album, SongProvider.INSTANCE
-                        .getAlbums()));
-        this.add(label = this.createButton(langs.getString("collections.genres")));
-        label.setMnemonic('G');
-        label.addActionListener(mouseEvent -> this
-                .triggerCollectionDisplayListeners(CollectionType.genre, SongProvider.INSTANCE
-                        .getGenres()));
-        this.add(label = this.createButton(langs.getString("collections.years")));
-        label.setMnemonic('Y');
-        label.addActionListener(mouseEvent -> this
-                .triggerCollectionDisplayListeners(CollectionType.year, SongProvider.INSTANCE
-                        .getYears()));
+        this.add(defaultLabel = label = this.createButton(Interface.getInstance().actions.get("view.all")));
+        this.add(label = this.createButton(Interface.getInstance().actions.get("view.artists")));
+        this.add(label = this.createButton(Interface.getInstance().actions.get("view.albums")));
+        this.add(label = this.createButton(Interface.getInstance().actions.get("view.genres")));
+        this.add(label = this.createButton(Interface.getInstance().actions.get("view.years")));
         this.add(new JLabel("\u23AF".repeat(6)));
-        this.add(label = this.createButton(langs.getString("collections.playlists")));
-        label.setMnemonic('P');
+        this.add(label = this.createButton(Interface.getInstance().actions.get("view.playlists")));
         this.add(new JLabel("\u23AF".repeat(6)));
-        this.add(label = this.createButton(langs.getString("actions.external.add.title")));
-        label.setMnemonic('E');
-        label.addActionListener(mouseEvent -> this.addNewSong());
+        this.add(label = this.createButton(Interface.getInstance().actions.get("addExternal")));
         
         addMouseListener(new MouseAdapter()
         {
@@ -123,7 +101,16 @@ public class Collections extends JPanel
     
     private JButton createButton(String text)
     {
-        JButton label = new JButton(text);
+        return setButton(new JButton(text));
+    }
+
+    private JButton createButton(Action action)
+    {
+        return setButton(new JButton(action));
+    }
+
+    private JButton setButton(JButton label)
+    {
         label.setFocusPainted(true);
         label.setMargin(new Insets(0, 0, 0, 0));
         label.setContentAreaFilled(false);

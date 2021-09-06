@@ -46,8 +46,7 @@ public class QueueList extends JPanel implements Queue.SongChangeListener, Queue
         c.gridy = 0;
         c.gridwidth = 1;
         header.add(new JLabel(" ".repeat(20) + langs.getString("interface.queue.title") + " ".repeat(20)), c);
-        this.clearButton = new JButton(langs.getString("actions.clear"));
-        this.clearButton.addActionListener(e -> Queue.getInstance().clear());
+        this.clearButton = new JButton(Interface.getInstance().actions.get("playback.clear"));
         c.gridy = 1;
         c.gridwidth = 1;
         header.add(clearButton, c);
