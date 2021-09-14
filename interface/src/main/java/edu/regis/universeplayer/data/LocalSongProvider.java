@@ -404,7 +404,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
         public void compute()
         {
             Process process;
-            String line;
+            String line, lineData;
             String[] streamData;
 
             String type;
@@ -526,12 +526,13 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                             }
                                         }
                                         case "track" -> {
-                                            line = line.substring(line
+                                            lineData = line.substring(line
                                                     .indexOf(':') + 2);
-                                            if (line.indexOf('/') >= 0)
+                                            if (lineData.indexOf('/') >= 0)
                                             {
                                                 track = Arrays
-                                                        .stream(line.split("/"))
+                                                        .stream(lineData
+                                                                .split("/"))
                                                         .map(Integer::parseInt)
                                                         .toArray(Integer[]::new);
                                             }
@@ -540,11 +541,11 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                                 if (track != null)
                                                 {
                                                     track[0] = Integer
-                                                            .parseInt(line);
+                                                            .parseInt(lineData);
                                                 }
                                                 else
                                                 {
-                                                    track = new Integer[]{Integer.parseInt(line), -1};
+                                                    track = new Integer[]{Integer.parseInt(lineData), -1};
                                                 }
                                             }
                                         }
@@ -563,12 +564,13 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                             }
                                         }
                                         case "disc" -> {
-                                            line = line.substring(line
+                                            lineData = line.substring(line
                                                     .indexOf(':') + 2);
-                                            if (line.indexOf('/') >= 0)
+                                            if (lineData.indexOf('/') >= 0)
                                             {
                                                 disc = Arrays
-                                                        .stream(line.split("/"))
+                                                        .stream(lineData
+                                                                .split("/"))
                                                         .map(Integer::parseInt)
                                                         .toArray(Integer[]::new);
                                             }
@@ -577,11 +579,11 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                                 if (disc != null)
                                                 {
                                                     disc[0] = Integer
-                                                            .parseInt(line);
+                                                            .parseInt(lineData);
                                                 }
                                                 else
                                                 {
-                                                    disc = new Integer[]{Integer.parseInt(line), -1};
+                                                    disc = new Integer[]{Integer.parseInt(lineData), -1};
                                                 }
                                             }
                                         }
@@ -602,18 +604,23 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                         case "duration:" -> {
                                             if (duration == 0)
                                             {
-                                                line = line.substring(line
+                                                lineData = line.substring(line
                                                         .indexOf(':') + 2, line
                                                         .indexOf(','));
-                                                duration = Long.parseLong(line
-                                                        .substring(0, 2)) * 3600 * 1000 + Long
-                                                        .parseLong(line
-                                                                .substring(3, 5)) * 60 * 1000 + Long
-                                                        .parseLong(line
-                                                                .substring(6, 8)) * 1000 + (long) (Float
-                                                        .parseFloat(line
-                                                                .substring(8, line
-                                                                        .length() - 1)) * 1000);
+                                                if (!lineData.equals(
+                                                        "N/A"))
+                                                {
+                                                    duration = Long
+                                                            .parseLong(lineData
+                                                                    .substring(0, 2)) * 3600 * 1000 + Long
+                                                            .parseLong(lineData
+                                                                    .substring(3, 5)) * 60 * 1000 + Long
+                                                            .parseLong(lineData
+                                                                    .substring(6, 8)) * 1000 + (long) (Float
+                                                            .parseFloat(lineData
+                                                                    .substring(8, lineData
+                                                                            .length() - 1)) * 1000);
+                                                }
                                             }
                                         }
                                         case "stream" -> {
@@ -755,7 +762,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                                                        .split(";"))
                                                                .stream()
                                                                .flatMap(Arrays::stream)
-                                                               .map(String::trim)
+                                                               .map(String::trim).map(s -> s.replaceAll("'", "''"))
                                                                .collect(Collectors
                                                                        .joining(";")))
                                                .append("', ");
@@ -845,6 +852,8 @@ public class LocalSongProvider implements SongProvider<LocalSong>
                                                                   .stream()
                                                                   .flatMap(Arrays::stream)
                                                                   .map(String::trim)
+                                                                  .map(s -> s
+                                                                          .replaceAll("'", "''"))
                                                                   .collect(Collectors
                                                                           .joining(";")))
                                                   .append("',");
