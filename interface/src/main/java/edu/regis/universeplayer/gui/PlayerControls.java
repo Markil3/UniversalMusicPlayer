@@ -37,7 +37,7 @@ import java.util.concurrent.ForkJoinPool;
  * @author William Hubbard
  * @version 0.1
  */
-public class PlayerControls extends JPanel implements Queue.SongChangeListener, PlaybackListener
+public class PlayerControls extends JPanel implements PlaybackListener
 {
     private static final Logger logger = LoggerFactory
             .getLogger(PlayerControls.class);
@@ -175,7 +175,6 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
         layout.putConstraint(SpringLayout.EAST, this, 5, SpringLayout.EAST, this.updateProgress);
         layout.putConstraint(SpringLayout.SOUTH, this, 5, SpringLayout.SOUTH, this.updateProgress);
 
-        Queue.getInstance().addSongChangeListener(this);
         PlayerManager.getPlayers().addPlaybackListener(this);
     }
 
@@ -437,69 +436,17 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
     }
 
     @Override
-    public void onSongChange(Queue queue)
-    {
-        this.service.execute(() -> {
-            QueryFuture<Void> command = PlayerManager.getPlayers().stopSong();
-            try
-            {
-                if (command != null && !command.getConfirmation().wasSuccessful())
-                {
-                    JOptionPane.showMessageDialog(this,
-                            command.getConfirmation().getError(),
-                            command.getConfirmation().getMessage(),
-                            JOptionPane.ERROR_MESSAGE);
-                    logger.error("Could not run command",
-                            command.getConfirmation().getError());
-                }
-                else
-                {
-                    command =
-                            PlayerManager.getPlayers()
-                                         .playSong(queue.getCurrentSong());
-                    if (!command.getConfirmation().wasSuccessful())
-                    {
-                        JOptionPane.showMessageDialog(this,
-                                command.getConfirmation().getError(),
-                                command.getConfirmation().getMessage(),
-                                JOptionPane.ERROR_MESSAGE);
-                        logger.error("Could not run command",
-                                command.getConfirmation().getError());
-                    }
-                    else
-                    {
-                        SwingUtilities.invokeLater(() -> {
-                            this.playButton.setIcon(PLAY_ICON);
-                            this.progress.setMaximum((int) (PlayerManager
-                                    .getPlayers()
-                                    .getCurrentSong().duration / 1000));
-                        });
-
-                    }
-                }
-            }
-            catch (ExecutionException | InterruptedException e)
-            {
-                logger.error("Could not get current playback status", e);
-                JOptionPane
-                        .showMessageDialog(this, e.getMessage(), langs
-                                .getString(
-                                        "error.command"), JOptionPane.ERROR_MESSAGE);
-            }
-        });
-    }
-
-    @Override
     public void onPlaybackChanged(PlaybackEvent status)
     {
-        switch (status.getInfo().getStatus())
-        {
-        case PLAYING -> this.playButton.setIcon(PAUSE_ICON);
-        case FINISHED -> Queue.getInstance().skipNext();
-        case PAUSED, STOPPED, EMPTY -> this.playButton.setIcon(PLAY_ICON);
-        }
-        this.progress.setValue((int) status.getInfo().getPlayTime());
-        this.progress.setMaximum((int) (status.getInfo()
-                                              .getSong().duration / 1000));
+        SwingUtilities.invokeLater(() -> {
+            switch (status.getInfo().getStatus())
+            {
+            case PLAYING -> this.playButton.setIcon(PAUSE_ICON);
+            case PAUSED, STOPPED, EMPTY -> this.playButton.setIcon(PLAY_ICON);
+            }
+            this.progress.setValue((int) status.getInfo().getPlayTime());
+            this.progress.setMaximum((int) (status.getInfo()
+                                                  .getSong().duration / 1000));
+        });
     }
 }

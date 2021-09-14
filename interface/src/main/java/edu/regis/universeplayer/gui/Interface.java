@@ -82,34 +82,6 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         return INSTANCE;
     }
 
-    public static void main(String[] args)
-    {
-        Interface inter = null;
-        PlayerManager.getPlayers();
-        try
-        {
-            /*
-             * Add this just in case of a crash or something. It won't work if the
-             * program is forcibly terminated by the OS, but it could be helpful
-             * otherwise.
-             */
-            logger.info("Starting application");
-
-            inter = new Interface();
-            inter.setSize(700, 500);
-            SongProvider.INSTANCE.addUpdateListener(inter);
-            inter.setVisible(true);
-        }
-        catch (Throwable e)
-        {
-            logger.error("Could not open browser background", e);
-            JOptionPane
-                    .showMessageDialog(inter != null && inter
-                            .isVisible() ? inter : null, e, langs
-                            .getString("error.generic"), JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
     /**
      * Creates an interface
      */
@@ -469,7 +441,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             {
                 if (this.isEnabled())
                 {
-                    controls.previousSong();
+                    Queue.getInstance().skipPrev();
                 }
             }
         });
@@ -482,7 +454,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             {
                 if (this.isEnabled())
                 {
-                    controls.nextSong();
+                    Queue.getInstance().skipNext();
                 }
             }
         });

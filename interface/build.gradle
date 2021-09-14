@@ -44,5 +44,5 @@ sourceCompatibility = JavaVersion.VERSION_16
 targetCompatibility = JavaVersion.VERSION_16
 
 // Define the main class for the application
-mainClassName = defaultPackage + '.gui.Interface'
+mainClassName = defaultPackage + '.PlayerEnvironment'
 //mainClassName = defaultPackage + '.localPlayer.Player'
