@@ -58,4 +58,13 @@ public class CommandReturn<T> implements Serializable
     {
         return this.confirmation;
     }
+
+    @Override
+    public String toString()
+    {
+        return "CommandReturn{" +
+                "returnValue=" + returnValue +
+                ", confirmation=" + confirmation +
+                '}';
+    }
 }

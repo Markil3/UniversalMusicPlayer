@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
@@ -145,7 +146,16 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
                                 /*
                                  * Not a response, just a generic update.
                                  */
-                                Object ob = deserializeObject(returnMessage[1]);
+                                Object ob;
+                                try
+                                {
+                                    ob = deserializeObject(returnMessage[1]);
+                                }
+                                catch (IOException e)
+                                {
+                                    throw new IOException("Could not " +
+                                            "deserialize " + Arrays.toString(returnMessage[1]), e);
+                                }
                                 this.triggerUpdateListeners(ob);
                                 logger.debug("Received update {}", ob);
                             }

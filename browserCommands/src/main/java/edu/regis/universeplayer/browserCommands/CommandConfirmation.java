@@ -19,7 +19,7 @@ public class CommandConfirmation implements Serializable
      */
     private Throwable errorCode;
     private String message;
-    
+
     /**
      * Confirms a successful command.
      */
@@ -27,7 +27,7 @@ public class CommandConfirmation implements Serializable
     {
         this("Command successful");
     }
-    
+
     /**
      * Confirms a successful command.
      *
@@ -38,7 +38,7 @@ public class CommandConfirmation implements Serializable
         this((BrowserError) null);
         this.message = message;
     }
-    
+
     /**
      * Confirms an unsuccessful command.
      *
@@ -48,7 +48,7 @@ public class CommandConfirmation implements Serializable
     {
         this.errorCode = error;
     }
-    
+
     /**
      * Checks to see if the command executed properly.
      *
@@ -58,7 +58,7 @@ public class CommandConfirmation implements Serializable
     {
         return this.errorCode == null;
     }
-    
+
     /**
      * Obtains the error returned by the browser.
      *
@@ -68,7 +68,7 @@ public class CommandConfirmation implements Serializable
     {
         return this.errorCode;
     }
-    
+
     /**
      * Obtains details as to the nature of the command execution.
      *
@@ -76,6 +76,15 @@ public class CommandConfirmation implements Serializable
      */
     public String getMessage()
     {
-        return this.errorCode != null ? this.errorCode.getMessage() : this.message;
+        return this.errorCode != null ? this.errorCode
+                .getMessage() : this.message;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "CommandConfirmation{" +
+                "message='" + this.getMessage() + '\'' +
+                '}';
     }
 }

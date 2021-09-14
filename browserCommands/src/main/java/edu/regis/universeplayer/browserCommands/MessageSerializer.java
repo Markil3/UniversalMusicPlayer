@@ -5,9 +5,11 @@
 package edu.regis.universeplayer.browserCommands;
 
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public interface MessageSerializer
 {
@@ -43,6 +45,10 @@ public interface MessageSerializer
      */
     default Object deserializeObject(byte[] message) throws IOException, ClassNotFoundException
     {
+        if (message == null || message.length == 0)
+        {
+            return null;
+        }
         try (ByteArrayInputStream byteStream = new ByteArrayInputStream(message))
         {
             try (ObjectInputStream stream = new ObjectInputStream(byteStream))
@@ -125,7 +131,16 @@ public interface MessageSerializer
                     .error("Malformed message, could not get message length.");
             return null;
         }
-        message = new byte[lengthBuffer.getInt()];
+        try
+        {
+            message = new byte[lengthBuffer.getInt()];
+        }
+        catch (NegativeArraySizeException e)
+        {
+            throw new IOException("Invalid array size for message " + Arrays
+                    .toString(messageNum)
+                    , e);
+        }
         /*
          * Writes the message
          */

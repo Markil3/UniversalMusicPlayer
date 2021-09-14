@@ -171,7 +171,8 @@ public class MessageHandler implements Runnable, MessageSerializer
                             }
                             catch (IOException e)
                             {
-                                logger.error("Could not send response message for" + update, e);
+                                logger.error("Could not send response message" +
+                                        " for " + update, e);
                                 running = false;
                             }
                         }
