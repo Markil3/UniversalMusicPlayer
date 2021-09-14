@@ -2,8 +2,10 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universeplayer;
+package edu.regis.universeplayer.player;
 
+import edu.regis.universeplayer.PlaybackListener;
+import edu.regis.universeplayer.PlaybackStatus;
 import edu.regis.universeplayer.browserCommands.QueryFuture;
 import edu.regis.universeplayer.data.Song;
 
@@ -19,31 +21,6 @@ import java.util.HashMap;
  */
 public interface Player<T extends Song>
 {
-    HashMap<Class<? extends Song>, Player<?>> REGISTERED_PLAYERS = new HashMap<>();
-    
-    /**
-     * Obtains a song player that can play the provided song.
-     *
-     * @param song - The song to play.
-     * @return A compatible player, or null if none is found.
-     */
-    static Player<?> getCompatiblePlayer(Song song)
-    {
-        Player<?> player = REGISTERED_PLAYERS.get(song.getClass());
-        if (player == null)
-        {
-            for (Class<? extends Song> songClass : REGISTERED_PLAYERS.keySet())
-            {
-                if (songClass.isAssignableFrom(song.getClass()))
-                {
-                    player = REGISTERED_PLAYERS.get(songClass);
-                    break;
-                }
-            }
-        }
-        return player;
-    }
-    
     /**
      * Obtains the song currently playing.
      *

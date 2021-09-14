@@ -2,7 +2,7 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universeplayer.localPlayer;
+package edu.regis.universeplayer.player;
 
 import java.io.IOException;
 import java.io.InputStream;

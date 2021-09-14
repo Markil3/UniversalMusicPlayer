@@ -2,7 +2,7 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universeplayer.player;
+package edu.regis.universeplayer.gui;
 
 import javax.swing.*;
 import javax.swing.border.LineBorder;

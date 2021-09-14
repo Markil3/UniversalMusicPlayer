@@ -4,7 +4,8 @@
 
 package edu.regis.universeplayer.data;
 
-import edu.regis.universeplayer.player.Interface;
+import edu.regis.universeplayer.ConfigManager;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +31,8 @@ public class DatabaseManager
             if (db == null || db.isClosed())
             {
                 Class.forName("org.sqlite.JDBC");
-                db = DriverManager.getConnection("jdbc:sqlite:" + new File(Interface.getDataDir().getAbsolutePath(), "universalmusic.db").getAbsolutePath());
+                db = DriverManager.getConnection("jdbc:sqlite:" + new File(ConfigManager
+                        .getDataDir().getAbsolutePath(), "universalmusic.db").getAbsolutePath());
             }
             warning = db.getWarnings();
             while (warning != null)

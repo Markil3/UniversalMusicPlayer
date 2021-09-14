@@ -2,18 +2,17 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universeplayer.player;
+package edu.regis.universeplayer.gui;
 
-import edu.regis.universeplayer.PlaybackInfo;
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
-import edu.regis.universeplayer.Player;
+import edu.regis.universeplayer.player.Player;
 import edu.regis.universeplayer.browserCommands.CommandConfirmation;
-import edu.regis.universeplayer.browserCommands.CommandReturn;
 import edu.regis.universeplayer.browserCommands.QueryFuture;
 import edu.regis.universeplayer.data.PlaybackEvent;
 import edu.regis.universeplayer.data.Queue;
 import edu.regis.universeplayer.data.Song;
+import edu.regis.universeplayer.player.PlayerManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,12 +44,6 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
     private static final ResourceBundle langs = ResourceBundle
             .getBundle("lang.interface", Locale.getDefault());
     private final ImageIcon PLAY_ICON, PAUSE_ICON;
-
-    /**
-     * A reference to the song currently playing.
-     */
-    private Song currentSong = null;
-    private Player currentPlayer = null;
 
     private final JButton playButton;
     private final JButton nextButton;
@@ -183,33 +176,34 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
         layout.putConstraint(SpringLayout.SOUTH, this, 5, SpringLayout.SOUTH, this.updateProgress);
 
         Queue.getInstance().addSongChangeListener(this);
+        PlayerManager.getPlayers().addPlaybackListener(this);
     }
 
     private void seek(float value)
     {
         this.service.execute(() -> {
-            if (this.currentPlayer != null)
+            QueryFuture<Void> command = PlayerManager.getPlayers().seek(value);
+            try
             {
-                QueryFuture<Void> command = this.currentPlayer.seek(value);
-                try
+                if (command != null && !command.getConfirmation()
+                                               .wasSuccessful())
                 {
-                    if (!command.getConfirmation().wasSuccessful())
-                    {
-                        JOptionPane.showMessageDialog(this,
-                                command.getConfirmation().getError(),
-                                command.getConfirmation().getMessage(),
-                                JOptionPane.ERROR_MESSAGE);
-                        logger.error("Could not run command",
-                                command.getConfirmation().getError());
-                    }
+                    logger.error("Could not run command",
+                            command.getConfirmation().getError());
+                    JOptionPane.showMessageDialog(this,
+                            command.getConfirmation().getError(),
+                            command.getConfirmation().getMessage(),
+                            JOptionPane.ERROR_MESSAGE);
                 }
-                catch (ExecutionException | InterruptedException e)
-                {
-                    logger.error("Could not run command", e);
-                    JOptionPane.showMessageDialog(this, e.getMessage(), langs
-                            .getString(
-                                    "error.command"), JOptionPane.ERROR_MESSAGE);
-                }
+            }
+            catch (ExecutionException | InterruptedException e)
+            {
+                logger.error("Could not run command",
+                        e);
+                JOptionPane.showMessageDialog(this,
+                        e,
+                        e.getMessage(),
+                        JOptionPane.ERROR_MESSAGE);
             }
         });
         this.triggerCommandListeners(PlaybackCommand.SEEK, value);
@@ -220,43 +214,41 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
         this.service.execute(() -> {
             try
             {
-                if (this.currentPlayer != null)
+                QueryFuture<PlaybackStatus> status =
+                        PlayerManager.getPlayers().getStatus();
+                CommandConfirmation confirmation = status.getConfirmation();
+                if (status.getConfirmation().wasSuccessful())
                 {
-                    QueryFuture<PlaybackStatus> status =
-                            this.currentPlayer.getStatus();
-                    CommandConfirmation confirmation = status.getConfirmation();
-                    if (status.getConfirmation().wasSuccessful())
+                    switch (status.get())
                     {
-                        switch (status.get())
+                    case PAUSED -> confirmation = PlayerManager.getPlayers()
+                                                               .play()
+                                                               .getConfirmation();
+                    case STOPPED, EMPTY -> {
+                        if (Queue.getInstance().size() > 0)
                         {
-                        case PAUSED -> confirmation = this.currentPlayer.play()
-                                                                    .getConfirmation();
-                        case STOPPED, EMPTY -> {
-                            if (Queue.getInstance().size() > 0)
+                            if (Queue.getInstance()
+                                     .getCurrentSong() == null)
                             {
-                                if (Queue.getInstance()
-                                         .getCurrentSong() == null)
-                                {
-                                    Queue.getInstance().skipToSong(0);
-                                }
-                                else
-                                {
-                                    confirmation = this.currentPlayer.play()
-                                                                     .getConfirmation();
-                                }
+                                Queue.getInstance().skipToSong(0);
+                            }
+                            else
+                            {
+                                confirmation = PlayerManager.getPlayers().play()
+                                                            .getConfirmation();
                             }
                         }
-                        }
                     }
-                    if (confirmation != null && !confirmation.wasSuccessful())
-                    {
-                        JOptionPane.showMessageDialog(this,
-                                confirmation.getError(),
-                                confirmation.getMessage(),
-                                JOptionPane.ERROR_MESSAGE);
-                        logger.error("Could not run command",
-                                confirmation.getError());
                     }
+                }
+                if (confirmation != null && !confirmation.wasSuccessful())
+                {
+                    logger.error("Could not run command",
+                            confirmation.getError());
+                    JOptionPane.showMessageDialog(this,
+                            confirmation.getError(),
+                            confirmation.getMessage(),
+                            JOptionPane.ERROR_MESSAGE);
                 }
             }
             catch (ExecutionException | InterruptedException e)
@@ -275,28 +267,26 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
         this.service.execute(() -> {
             try
             {
-                if (this.currentPlayer != null)
+                QueryFuture<PlaybackStatus> status =
+                        PlayerManager.getPlayers().getStatus();
+                CommandConfirmation confirmation = status.getConfirmation();
+                if (status.getConfirmation().wasSuccessful())
                 {
-                    QueryFuture<PlaybackStatus> status =
-                            this.currentPlayer.getStatus();
-                    CommandConfirmation confirmation = status.getConfirmation();
-                    if (status.getConfirmation().wasSuccessful())
+                    switch (status.get())
                     {
-                        switch (status.get())
-                        {
-                        case PLAYING -> confirmation =
-                                this.currentPlayer.pause().getConfirmation();
-                        }
+                    case PLAYING -> confirmation =
+                            PlayerManager.getPlayers().pause()
+                                         .getConfirmation();
                     }
-                    if (confirmation != null && !confirmation.wasSuccessful())
-                    {
-                        JOptionPane.showMessageDialog(this,
-                                confirmation.getError(),
-                                confirmation.getMessage(),
-                                JOptionPane.ERROR_MESSAGE);
-                        logger.error("Could not run command",
-                                confirmation.getError());
-                    }
+                }
+                if (confirmation != null && !confirmation.wasSuccessful())
+                {
+                    logger.error("Could not run command",
+                            confirmation.getError());
+                    JOptionPane.showMessageDialog(this,
+                            confirmation.getError(),
+                            confirmation.getMessage(),
+                            JOptionPane.ERROR_MESSAGE);
                 }
             }
             catch (ExecutionException | InterruptedException e)
@@ -318,45 +308,44 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
         this.service.execute(() -> {
             try
             {
-                if (this.currentPlayer != null)
+                QueryFuture<PlaybackStatus> status =
+                        PlayerManager.getPlayers().getStatus();
+                CommandConfirmation confirmation = status.getConfirmation();
+                if (status.getConfirmation().wasSuccessful())
                 {
-                    QueryFuture<PlaybackStatus> status =
-                            this.currentPlayer.getStatus();
-                    CommandConfirmation confirmation = status.getConfirmation();
-                    if (status.getConfirmation().wasSuccessful())
+                    switch (status.get())
                     {
-                        switch (status.get())
+                    case PAUSED -> confirmation = PlayerManager.getPlayers()
+                                                               .play()
+                                                               .getConfirmation();
+                    case PLAYING -> confirmation = PlayerManager.getPlayers()
+                                                                .pause()
+                                                                .getConfirmation();
+                    case STOPPED, EMPTY -> {
+                        if (Queue.getInstance().size() > 0)
                         {
-                        case PAUSED -> confirmation = this.currentPlayer.play()
-                                                                    .getConfirmation();
-                        case PLAYING -> confirmation = this.currentPlayer.pause()
-                                                                     .getConfirmation();
-                        case STOPPED, EMPTY -> {
-                            if (Queue.getInstance().size() > 0)
+                            if (Queue.getInstance()
+                                     .getCurrentSong() == null)
                             {
-                                if (Queue.getInstance()
-                                         .getCurrentSong() == null)
-                                {
-                                    Queue.getInstance().skipToSong(0);
-                                }
-                                else
-                                {
-                                    confirmation = this.currentPlayer.play()
-                                                                     .getConfirmation();
-                                }
+                                Queue.getInstance().skipToSong(0);
+                            }
+                            else
+                            {
+                                confirmation = PlayerManager.getPlayers().play()
+                                                            .getConfirmation();
                             }
                         }
-                        }
                     }
-                    if (confirmation != null && !confirmation.wasSuccessful())
-                    {
-                        JOptionPane.showMessageDialog(this,
-                                confirmation.getError(),
-                                confirmation.getMessage(),
-                                JOptionPane.ERROR_MESSAGE);
-                        logger.error("Could not run command",
-                                confirmation.getError());
                     }
+                }
+                if (confirmation != null && !confirmation.wasSuccessful())
+                {
+                    JOptionPane.showMessageDialog(this,
+                            confirmation.getError(),
+                            confirmation.getMessage(),
+                            JOptionPane.ERROR_MESSAGE);
+                    logger.error("Could not run command",
+                            confirmation.getError());
                 }
             }
             catch (ExecutionException | InterruptedException e)
@@ -450,103 +439,67 @@ public class PlayerControls extends JPanel implements Queue.SongChangeListener, 
     @Override
     public void onSongChange(Queue queue)
     {
-        if (this.currentSong != null)
-        {
-            if (this.currentPlayer != null)
+        this.service.execute(() -> {
+            QueryFuture<Void> command = PlayerManager.getPlayers().stopSong();
+            try
             {
-                this.service.execute(() -> {
-                    QueryFuture<Void> command = this.currentPlayer.stopSong();
-                    try
-                    {
-                        if (!command.getConfirmation().wasSuccessful())
-                        {
-                            JOptionPane.showMessageDialog(this,
-                                    command.getConfirmation().getError(),
-                                    command.getConfirmation().getMessage(),
-                                    JOptionPane.ERROR_MESSAGE);
-                            logger.error("Could not run command",
-                                    command.getConfirmation().getError());
-                        }
-                    }
-                    catch (ExecutionException | InterruptedException e)
-                    {
-                        logger.error("Could not get current playback status", e);
-                        JOptionPane
-                                .showMessageDialog(this, e.getMessage(), langs
-                                        .getString(
-                                                "error.command"), JOptionPane.ERROR_MESSAGE);
-                    }
-                });
-            }
-        }
-        this.currentSong = queue.getCurrentSong();
-        this.playButton.setIcon(PLAY_ICON);
-        if (this.currentSong != null)
-        {
-            this.currentPlayer = Player.REGISTERED_PLAYERS
-                    .get(this.currentSong.getClass());
-            this.progress.setMaximum((int) (this.currentSong.duration / 1000));
-            if (this.currentPlayer != null)
-            {
-                if (!this.currentPlayer.hasPlaybackListener(this))
+                if (command != null && !command.getConfirmation().wasSuccessful())
                 {
-                    this.currentPlayer.addPlaybackListener(this);
+                    JOptionPane.showMessageDialog(this,
+                            command.getConfirmation().getError(),
+                            command.getConfirmation().getMessage(),
+                            JOptionPane.ERROR_MESSAGE);
+                    logger.error("Could not run command",
+                            command.getConfirmation().getError());
                 }
-                this.service.execute(() -> {
-                    QueryFuture<Void> command =
-                            this.currentPlayer.loadSong(this.currentSong);
-                    try
+                else
+                {
+                    command =
+                            PlayerManager.getPlayers()
+                                         .playSong(queue.getCurrentSong());
+                    if (!command.getConfirmation().wasSuccessful())
                     {
-                        if (!command.getConfirmation().wasSuccessful())
-                        {
-                            JOptionPane.showMessageDialog(this,
-                                    command.getConfirmation().getError(),
-                                    command.getConfirmation().getMessage(),
-                                    JOptionPane.ERROR_MESSAGE);
-                            logger.error("Could not run command",
-                                    command.getConfirmation().getError());
-                        }
+                        JOptionPane.showMessageDialog(this,
+                                command.getConfirmation().getError(),
+                                command.getConfirmation().getMessage(),
+                                JOptionPane.ERROR_MESSAGE);
+                        logger.error("Could not run command",
+                                command.getConfirmation().getError());
                     }
-                    catch (ExecutionException | InterruptedException e)
+                    else
                     {
-                        logger.error("Could not get current playback status", e);
-                        JOptionPane
-                                .showMessageDialog(this, e.getMessage(), langs
-                                        .getString(
-                                                "error.command"), JOptionPane.ERROR_MESSAGE);
-                    }
-                });
+                        SwingUtilities.invokeLater(() -> {
+                            this.playButton.setIcon(PLAY_ICON);
+                            this.progress.setMaximum((int) (PlayerManager
+                                    .getPlayers()
+                                    .getCurrentSong().duration / 1000));
+                        });
 
-//                this.currentPlayer.play();
+                    }
+                }
             }
-            else
+            catch (ExecutionException | InterruptedException e)
             {
-                logger.error("No logger found for song {}", this.currentSong
-                        .getClass());
+                logger.error("Could not get current playback status", e);
+                JOptionPane
+                        .showMessageDialog(this, e.getMessage(), langs
+                                .getString(
+                                        "error.command"), JOptionPane.ERROR_MESSAGE);
             }
-        }
-        else
-        {
-            this.currentPlayer = null;
-            this.progress.setMaximum(0);
-        }
+        });
     }
 
     @Override
     public void onPlaybackChanged(PlaybackEvent status)
     {
-        if (status.getSource() != null && status
-                .getSource() == this.currentPlayer)
+        switch (status.getInfo().getStatus())
         {
-            switch (status.getInfo().getStatus())
-            {
-            case PLAYING -> this.playButton.setIcon(PAUSE_ICON);
-            case FINISHED -> Queue.getInstance().skipNext();
-            case PAUSED, STOPPED, EMPTY -> this.playButton.setIcon(PLAY_ICON);
-            }
-            this.progress.setValue((int) status.getInfo().getPlayTime());
-            this.progress.setMaximum((int) (status.getInfo()
-                                                  .getSong().duration / 1000));
+        case PLAYING -> this.playButton.setIcon(PAUSE_ICON);
+        case FINISHED -> Queue.getInstance().skipNext();
+        case PAUSED, STOPPED, EMPTY -> this.playButton.setIcon(PLAY_ICON);
         }
+        this.progress.setValue((int) status.getInfo().getPlayTime());
+        this.progress.setMaximum((int) (status.getInfo()
+                                              .getSong().duration / 1000));
     }
 }

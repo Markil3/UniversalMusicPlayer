@@ -2,19 +2,17 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universeplayer.player;
+package edu.regis.universeplayer.gui;
 
-import edu.regis.universeplayer.Player;
+import edu.regis.universeplayer.player.Player;
 import edu.regis.universeplayer.browser.Browser;
-import edu.regis.universeplayer.browser.BrowserPlayer;
-import edu.regis.universeplayer.browserCommands.CommandError;
+import edu.regis.universeplayer.player.BrowserPlayer;
 import edu.regis.universeplayer.browserCommands.QueryFuture;
 import edu.regis.universeplayer.data.InternetSong;
 import edu.regis.universeplayer.data.Queue;
 import edu.regis.universeplayer.data.*;
-import edu.regis.universeplayer.localPlayer.LocalPlayer;
-
-import net.harawata.appdirs.AppDirsFactory;
+import edu.regis.universeplayer.player.LocalPlayer;
+import edu.regis.universeplayer.player.PlayerManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +21,6 @@ import javax.swing.*;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,10 +47,6 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             .getBundle("lang.interface", Locale.getDefault());
 
     private static Interface INSTANCE;
-
-    private static File dataDir;
-    private static File commDir;
-    private static File configDir;
 
     public final ActionMap actions = new ActionMap();
 
@@ -82,10 +75,6 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
      */
     private final PlayerControls controls;
 
-    /**
-     * A link to the browser.
-     */
-    private final ArrayList<Player<?>> players = new ArrayList<>();
     private int currentPlayer = -1;
 
     public static Interface getInstance()
@@ -95,10 +84,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
 
     public static void main(String[] args)
     {
-        Thread browserThread;
         Interface inter = null;
-        Browser browser;
-        BrowserPlayer browserPlayer;
+        PlayerManager.getPlayers();
         try
         {
             /*
@@ -112,51 +99,6 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             inter.setSize(700, 500);
             SongProvider.INSTANCE.addUpdateListener(inter);
             inter.setVisible(true);
-
-            browser = Browser.createBrowser();
-            browserThread = new Thread(browser);
-            browserThread.start();
-
-            Player.REGISTERED_PLAYERS.put(LocalSong.class, new LocalPlayer());
-
-            try
-            {
-                inter.players.add(browserPlayer = new BrowserPlayer());
-                logger.debug("Sending ping");
-                browser.sendObject("ping");
-                Runtime.getRuntime()
-                       .addShutdownHook(new Thread(browserPlayer::close));
-                Player.REGISTERED_PLAYERS
-                        .put(InternetSong.class, browserPlayer);
-
-//                LinkedList<Future<Object>> pingRequests = new LinkedList<>();
-//                for (int i = 0; i < 20; i++)
-//                {
-//                    logger.info("Sending ping");
-//                    pingRequests.add(browser.sendObject("ping"));
-//                }
-//
-//                LinkedList<Future<Object>> toRemove = new LinkedList<>();
-//                while (pingRequests.size() > 0)
-//                {
-//                    for (Future<Object> future : pingRequests)
-//                    {
-//                        if (future.isDone())
-//                        {
-//                            logger.info("Receiving {}", future.get());
-//                            toRemove.add(future);
-//                        }
-//                    }
-//                    pingRequests.removeAll(toRemove);
-//                    toRemove.clear();
-//                }
-            }
-            catch (IOException e)
-            {
-                logger.error("Could not open browser background", e);
-                JOptionPane.showMessageDialog(inter, e, langs
-                        .getString("error.browser.launch"), JOptionPane.ERROR_MESSAGE);
-            }
         }
         catch (Throwable e)
         {
@@ -166,82 +108,6 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                             .isVisible() ? inter : null, e, langs
                             .getString("error.generic"), JOptionPane.ERROR_MESSAGE);
         }
-    }
-
-    /**
-     * Obtains the data storage directory for the application, creating it if
-     * needed.
-     *
-     * @return The data storage directory.
-     */
-    public static File getDataDir()
-    {
-        if (dataDir == null)
-        {
-            dataDir = new File(AppDirsFactory.getInstance()
-                                             .getUserDataDir("universalmusic", null, null, true));
-            if (!dataDir.exists())
-            {
-                if (!dataDir.mkdir())
-                {
-                    logger.error("Could not create data directory {}", dataDir);
-                }
-            }
-        }
-        return dataDir;
-    }
-
-    /**
-     * Obtains the configuration directory for the application, creating it if
-     * needed.
-     *
-     * @return The configuration directory.
-     */
-    public static File getConfigDir()
-    {
-        if (configDir == null)
-        {
-            configDir = new File(AppDirsFactory.getInstance()
-                                               .getUserConfigDir("universalmusic", null, null, true));
-            if (!configDir.exists())
-            {
-                if (!configDir.mkdir())
-                {
-                    logger.error("Could not create configuration directory {}", configDir);
-                }
-            }
-        }
-        return configDir;
-    }
-
-    /**
-     * Obtains the directory for memory mapped files
-     *
-     * @return The communications storage directory.
-     */
-    public static File getCommDir()
-    {
-        if (commDir == null)
-        {
-            commDir = new File(AppDirsFactory.getInstance()
-                                             .getSharedDir("universalmusic", null, null), "comm");
-            if (!commDir.getParentFile().exists())
-            {
-                if (!commDir.getParentFile().mkdir())
-                {
-                    logger.error("Could not create shared directory {}", commDir
-                            .getParent());
-                }
-            }
-            if (!commDir.exists())
-            {
-                if (!commDir.mkdir())
-                {
-                    logger.error("Could not create data directory {}", commDir);
-                }
-            }
-        }
-        return commDir;
     }
 
     /**
@@ -396,49 +262,35 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                                 @Override
                                 protected Void doInBackground() throws Exception
                                 {
-                                    Interface.this.players.stream()
-                                                          .filter(p -> p instanceof BrowserPlayer)
-                                                          .map(p -> (BrowserPlayer) p)
-                                                          .findFirst()
-                                                          .ifPresentOrElse(p -> {
-                                                              logger.debug("Throwing " +
-                                                                      "error");
-                                                              QueryFuture<Void> command = p
-                                                                      .throwError((false));
-                                                              try
-                                                              {
-                                                                  if (!command
-                                                                          .getConfirmation()
-                                                                          .wasSuccessful())
-                                                                  {
-                                                                      logger.error("Could not run command",
-                                                                              command.getConfirmation()
-                                                                                     .getError());
-                                                                      JOptionPane
-                                                                              .showMessageDialog(Interface.this,
-                                                                                      command.getConfirmation()
-                                                                                             .getError(),
-                                                                                      command.getConfirmation()
-                                                                                             .getMessage(),
-                                                                                      JOptionPane.ERROR_MESSAGE);
-                                                                  }
-                                                              }
-                                                              catch (ExecutionException | InterruptedException executionException)
-                                                              {
-                                                                  logger.error("Error" +
-                                                                          " creating " +
-                                                                          "debug " +
-                                                                          "message", executionException);
-                                                                  JOptionPane
-                                                                          .showMessageDialog(Interface.this, executionException
-                                                                                  .getMessage(), langs
-                                                                                  .getString(
-                                                                                          "error.command"), JOptionPane.ERROR_MESSAGE);
-                                                              }
-                                                          }, () -> JOptionPane
-                                                                  .showMessageDialog(Interface.this, langs
-                                                                          .getString("error.browser.null"), langs
-                                                                          .getString("error.debug.error"), JOptionPane.ERROR_MESSAGE));
+                                    QueryFuture<Void> command = PlayerManager.getPlayers().throwError(false);
+                                    try
+                                    {
+                                        if (!command.getConfirmation().wasSuccessful())
+                                        {
+                                            logger.error("Could not run command",
+                                                    command.getConfirmation()
+                                                           .getError());
+                                            JOptionPane
+                                                    .showMessageDialog(Interface.this,
+                                                            command.getConfirmation()
+                                                                   .getError(),
+                                                            command.getConfirmation()
+                                                                   .getMessage(),
+                                                            JOptionPane.ERROR_MESSAGE);
+                                        }
+                                    }
+                                    catch (ExecutionException | InterruptedException executionException)
+                                    {
+                                        logger.error("Error" +
+                                                " creating " +
+                                                "debug " +
+                                                "message", executionException);
+                                        JOptionPane
+                                                .showMessageDialog(Interface.this, executionException
+                                                        .getMessage(), langs
+                                                        .getString(
+                                                                "error.command"), JOptionPane.ERROR_MESSAGE);
+                                    }
                                     return null;
                                 }
                             }.execute();
@@ -578,7 +430,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             {
                 if (this.isEnabled())
                 {
-                    controls.play();
+                    PlayerManager.getPlayers().play();
                 }
             }
         });
@@ -591,7 +443,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             {
                 if (this.isEnabled())
                 {
-                    controls.pause();
+                    PlayerManager.getPlayers().pause();
                 }
             }
         });
@@ -604,7 +456,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             {
                 if (this.isEnabled())
                 {
-                    controls.togglePlayback();
+                    PlayerManager.getPlayers().toggle();
                 }
             }
         });
@@ -796,7 +648,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     @Override
     public void windowClosing(WindowEvent windowEvent)
     {
-        this.players.forEach(Player::close);
+        PlayerManager.getPlayers().shutdownPlayers();
     }
 
     @Override

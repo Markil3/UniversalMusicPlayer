@@ -1,20 +1,22 @@
 /*
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
-package edu.regis.universeplayer.localPlayer;
+package edu.regis.universeplayer.player;
 
 import com.intervigil.wave.WaveReader;
+
 import edu.regis.universeplayer.PlaybackInfo;
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
-import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browserCommands.CommandConfirmation;
 import edu.regis.universeplayer.browserCommands.QueryFuture;
 import edu.regis.universeplayer.data.LocalSong;
 import edu.regis.universeplayer.data.PlaybackEvent;
 import edu.regis.universeplayer.data.Song;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory;
 import uk.co.caprica.vlcj.media.MediaRef;
 import uk.co.caprica.vlcj.media.TrackType;
@@ -24,6 +26,7 @@ import uk.co.caprica.vlcj.player.base.StatusApi;
 import uk.co.caprica.vlcj.player.component.AudioPlayerComponent;
 
 import javax.swing.*;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -39,7 +42,8 @@ import java.util.concurrent.*;
  */
 public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
 {
-    private static final Logger logger = LoggerFactory.getLogger(LocalPlayer.class);
+    private static final Logger logger = LoggerFactory
+            .getLogger(LocalPlayer.class);
 
     private final MediaPlayerFactory playerFactory;
     private final AudioPlayerComponent player;
@@ -73,7 +77,8 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     }
 
     /**
-     * Saves the current file as a WAVE file somewhere else. This method is meant for testing only.
+     * Saves the current file as a WAVE file somewhere else. This method is
+     * meant for testing only.
      *
      * @param file - The file to save to.
      */
@@ -120,21 +125,35 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
             this.stopSong();
         }
         this.currentSong = song;
-        this.player.mediaPlayer().media().play(song.file.getAbsolutePath());
-        return new NullFuture<>();
+        if (!this.player.mediaPlayer().media()
+                        .play(song.file.getAbsolutePath()))
+        {
+            return new NullFuture<>(new RuntimeException("Could not play " +
+                    "song " + song));
+        }
+        else
+        {
+            return new NullFuture<>();
+        }
     }
 
     @Override
     public QueryFuture<Void> play()
     {
-        this.player.mediaPlayer().submit((WrappedRunnable) () -> this.player.mediaPlayer().controls().play());
+        this.player.mediaPlayer()
+                   .submit((WrappedRunnable) () -> this.player.mediaPlayer()
+                                                              .controls()
+                                                              .play());
         return new NullFuture<>();
     }
 
     @Override
     public QueryFuture<Void> pause()
     {
-        this.player.mediaPlayer().submit((WrappedRunnable) () -> this.player.mediaPlayer().controls().pause());
+        this.player.mediaPlayer()
+                   .submit((WrappedRunnable) () -> this.player.mediaPlayer()
+                                                              .controls()
+                                                              .pause());
         return new NullFuture<>();
     }
 
@@ -154,15 +173,20 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     @Override
     public QueryFuture<Void> stopSong()
     {
-        this.player.mediaPlayer().submit((WrappedRunnable) () -> this.player.mediaPlayer().controls().stop());
+        this.player.mediaPlayer()
+                   .submit((WrappedRunnable) () -> this.player.mediaPlayer()
+                                                              .controls()
+                                                              .stop());
         return new NullFuture<>();
     }
 
     @Override
     public QueryFuture<Void> seek(float time)
     {
-        this.player.mediaPlayer().submit((WrappedRunnable) () -> this.player.mediaPlayer().controls()
-                                                          .setTime((long) (time * 1000)));
+        this.player.mediaPlayer()
+                   .submit((WrappedRunnable) () -> this.player.mediaPlayer()
+                                                              .controls()
+                                                              .setTime((long) (time * 1000)));
         return new NullFuture<>();
     }
 
@@ -184,13 +208,15 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     @Override
     public QueryFuture<Float> getCurrentTime()
     {
-        return new NullFuture<>(this.player.mediaPlayer().status().time() / 1000F);
+        return new NullFuture<>(this.player.mediaPlayer().status()
+                                           .time() / 1000F);
     }
 
     @Override
     public QueryFuture<Float> getLength()
     {
-        return new NullFuture<>(this.player.mediaPlayer().status().length() / 1000F);
+        return new NullFuture<>(this.player.mediaPlayer().status()
+                                           .length() / 1000F);
     }
 
     @Override
@@ -227,7 +253,8 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
      * @param file - The file to read
      * @return An raw stream for the file
      * @throws FileNotFoundException - Thrown should the file not exist.
-     * @throws IOException           - Thrown should an error occur when reading the file
+     * @throws IOException           - Thrown should an error occur when reading
+     *                               the file
      */
     public static AudioFile getAudioStream(File file) throws IOException
     {
@@ -235,12 +262,14 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     }
 
     /**
-     * Converts any audio file to a stream containing WAV audio file data (courtesy of FFMPEG).
+     * Converts any audio file to a stream containing WAV audio file data
+     * (courtesy of FFMPEG).
      *
      * @param file - The file to convert
      * @return An input stream containing the file data
      * @throws FileNotFoundException - Thrown should the file not exist.
-     * @throws IOException           - Thrown should an error occur when reading the file
+     * @throws IOException           - Thrown should an error occur when reading
+     *                               the file
      */
     protected static Process convertFile(File file) throws FileNotFoundException, IOException
     {
@@ -304,7 +333,8 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     /**
      * The media started playing.
      * <p>
-     * There is no guarantee that a video output has been created at this point.
+     * There is no guarantee that a video output has been created at this
+     * point.
      *
      * @param mediaPlayer media player that raised the event
      */
@@ -312,7 +342,10 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     public void playing(MediaPlayer mediaPlayer)
     {
         logger.debug("Local player playing.");
-        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer.status().time(), PlaybackStatus.PLAYING)))));
+        SwingUtilities.invokeLater(() -> this.listeners
+                .forEach(playbackListener -> playbackListener
+                        .onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer
+                                .status().time(), PlaybackStatus.PLAYING)))));
     }
 
     /**
@@ -324,15 +357,19 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     public void paused(MediaPlayer mediaPlayer)
     {
         logger.debug("Local player paused.");
-        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer.status().time(), PlaybackStatus.PAUSED)))));
+        SwingUtilities.invokeLater(() -> this.listeners
+                .forEach(playbackListener -> playbackListener
+                        .onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer
+                                .status().time(), PlaybackStatus.PAUSED)))));
     }
 
     /**
      * Media stopped.
      * <p>
-     * A stopped event may be raised under certain circumstances even if the media player is not playing (e.g. as part
-     * of the associated media list player sub-item handling). Client applications must therefore be prepared to handle
-     * such a situation.
+     * A stopped event may be raised under certain circumstances even if the
+     * media player is not playing (e.g. as part of the associated media list
+     * player sub-item handling). Client applications must therefore be prepared
+     * to handle such a situation.
      *
      * @param mediaPlayer media player that raised the event
      */
@@ -340,7 +377,10 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     public void stopped(MediaPlayer mediaPlayer)
     {
         logger.debug("Local player stopped prematurely.");
-        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer.status().time(), PlaybackStatus.STOPPED)))));
+        SwingUtilities.invokeLater(() -> this.listeners
+                .forEach(playbackListener -> playbackListener
+                        .onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer
+                                .status().time(), PlaybackStatus.STOPPED)))));
     }
 
     /**
@@ -374,7 +414,10 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     public void finished(MediaPlayer mediaPlayer)
     {
         logger.debug("Local player finished.");
-        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer.status().time(), PlaybackStatus.FINISHED)))));
+        SwingUtilities.invokeLater(() -> this.listeners
+                .forEach(playbackListener -> playbackListener
+                        .onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, mediaPlayer
+                                .status().time(), PlaybackStatus.FINISHED)))));
     }
 
     /**
@@ -386,7 +429,9 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     @Override
     public void timeChanged(MediaPlayer mediaPlayer, long newTime)
     {
-        SwingUtilities.invokeLater(() -> this.listeners.forEach(playbackListener -> playbackListener.onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, newTime / 1000F, PlaybackStatus.PLAYING)))));
+        SwingUtilities.invokeLater(() -> this.listeners
+                .forEach(playbackListener -> playbackListener
+                        .onPlaybackChanged(new PlaybackEvent(this, new PlaybackInfo(this.currentSong, newTime / 1000F, PlaybackStatus.PLAYING)))));
     }
 
     /**
@@ -531,7 +576,8 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
      * other application) starts/stops playing media.
      *
      * @param mediaPlayer media player that raised the event
-     * @param corked      <code>true</code> if corked; otherwise <code>false</code>
+     * @param corked      <code>true</code> if corked; otherwise
+     *                    <code>false</code>
      */
     @Override
     public void corked(MediaPlayer mediaPlayer, boolean corked)
@@ -543,7 +589,8 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
      * The audio was muted/un-muted.
      *
      * @param mediaPlayer media player that raised the event
-     * @param muted       <code>true</code> if muted; otherwise <code>false</code>
+     * @param muted       <code>true</code> if muted; otherwise
+     *                    <code>false</code>
      */
     @Override
     public void muted(MediaPlayer mediaPlayer, boolean muted)
@@ -609,9 +656,10 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
      * The event will be fired again if the media is played again after a native
      * stopped or finished event is received.
      * <p>
-     * Waiting for this event may be more reliable than using {@link #playing(MediaPlayer)}
-     * or {@link #videoOutput(MediaPlayer, int)} in some cases (logo and marquee
-     * already mentioned, also setting audio tracks, sub-title tracks and so on).
+     * Waiting for this event may be more reliable than using {@link
+     * #playing(MediaPlayer)} or {@link #videoOutput(MediaPlayer, int)} in some
+     * cases (logo and marquee already mentioned, also setting audio tracks,
+     * sub-title tracks and so on).
      *
      * @param mediaPlayer media player that raised the event
      */
@@ -692,27 +740,40 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     private static class NullFuture<T> implements QueryFuture<T>
     {
         private final T value;
+        private final CommandConfirmation confirmation;
 
         NullFuture()
         {
-            this(null);
+            this((T) null);
         }
 
         NullFuture(T returnVal)
         {
             this.value = returnVal;
+            this.confirmation = new CommandConfirmation();
+        }
+
+        NullFuture(Throwable error)
+        {
+            this(error, null);
+        }
+
+        NullFuture(Throwable error, T returnVal)
+        {
+            this.value = returnVal;
+            this.confirmation = new CommandConfirmation(error);
         }
 
         @Override
         public CommandConfirmation getConfirmation() throws CancellationException
         {
-            return new CommandConfirmation();
+            return this.confirmation;
         }
 
         @Override
         public CommandConfirmation getConfirmation(long timeout, TimeUnit unit)
         {
-            return new CommandConfirmation();
+            return this.getConfirmation();
         }
 
         @Override
@@ -742,7 +803,7 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
         @Override
         public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
         {
-            return this.value;
+            return get();
         }
     }
 

@@ -2,7 +2,7 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universeplayer.player;
+package edu.regis.universeplayer.gui;
 
 import java.awt.*;
 import java.awt.event.FocusAdapter;
@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 import javax.swing.*;
 
 import com.wordpress.tips4java.ScrollablePanel;
-import edu.regis.universeplayer.ClickListener;
+
 import edu.regis.universeplayer.data.Album;
 import edu.regis.universeplayer.data.CollectionType;
 import edu.regis.universeplayer.data.Song;

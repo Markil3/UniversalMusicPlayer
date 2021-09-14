@@ -2,11 +2,10 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universeplayer.player;
+package edu.regis.universeplayer.gui;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Locale;
@@ -16,7 +15,6 @@ import javax.swing.*;
 
 import edu.regis.universeplayer.data.CollectionType;
 import edu.regis.universeplayer.data.Song;
-import edu.regis.universeplayer.data.SongProvider;
 
 /**
  * This panel links to various song collections the player has set up.

@@ -5,8 +5,7 @@
 package edu.regis.universeplayer.data;
 
 import edu.regis.universeplayer.PlaybackInfo;
-import edu.regis.universeplayer.Player;
-import edu.regis.universeplayer.localPlayer.LocalPlayer;
+import edu.regis.universeplayer.player.Player;
 
 import java.util.EventObject;
 

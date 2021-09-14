@@ -2,12 +2,12 @@
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
 
-package edu.regis.universeplayer.browser;
+package edu.regis.universeplayer.player;
 
 import edu.regis.universeplayer.PlaybackInfo;
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
-import edu.regis.universeplayer.Player;
+import edu.regis.universeplayer.browser.Browser;
 import edu.regis.universeplayer.browserCommands.*;
 import edu.regis.universeplayer.data.InternetSong;
 import edu.regis.universeplayer.data.PlaybackEvent;
@@ -57,6 +57,22 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             browserRef = Browser.getInstance();
         }
         return browserRef;
+    }
+
+    public BrowserPlayer()
+    {
+        Thread browserThread = new Thread(() -> {
+            try
+            {
+                this.browserRef = Browser.createBrowser();
+                this.browserRef.run();
+            }
+            catch (IOException | InterruptedException e)
+            {
+                logger.error("Could not initialize browser", e);
+            }
+        });
+        browserThread.start();
     }
 
     @Override
