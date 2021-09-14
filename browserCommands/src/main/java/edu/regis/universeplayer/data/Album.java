@@ -4,6 +4,8 @@
 
 package edu.regis.universeplayer.data;
 
+import java.util.Arrays;
+
 import javax.swing.ImageIcon;
 
 public class Album implements Comparable<Album>
@@ -20,13 +22,22 @@ public class Album implements Comparable<Album>
     @Override
     public int compareTo(Album o)
     {
-        if (o != null)
+        if (o != null && o.name != null)
         {
-            return this.name.compareTo(o.name);
+            return this.name.compareToIgnoreCase(o.name);
         }
         else
         {
             return -1;
         }
+    }
+
+    @Override
+    public String toString()
+    {
+        return "Album{" +
+                "name='" + name + '\'' +
+                ", artists=" + Arrays.toString(artists) +
+                '}';
     }
 }

@@ -833,11 +833,13 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         this.controls.setUpdateProgress(updated, totalUpdate, updating);
         if (updated == totalUpdate || totalUpdate == 0)
         {
-            logger.debug("Resetting the song provider.");
+            Collection<Song> songs = SongProvider.INSTANCE.getSongs();
+            logger.debug("Resetting the song provider with {} songs.",
+                    songs.size());
             /*
              * TODO - Add some way to get back to the current view, just updated
              */
-            this.updateSongs(SongProvider.INSTANCE.getSongs());
+            this.updateSongs(songs);
         }
     }
 
