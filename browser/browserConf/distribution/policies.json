@@ -15,6 +15,9 @@
       "Fingerprinting": true
     },
     "DontCheckDefaultBrowser": true,
+    "ExtensionSettings": {
+      ${preinstalled}
+    },
     "Permissions": {
       "Camera": {
         "BlockNewRequests": true

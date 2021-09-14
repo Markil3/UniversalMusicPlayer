@@ -8,7 +8,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -22,31 +24,32 @@ import edu.regis.universeplayer.browserCommands.MessageRunner;
 public class Browser extends MessageRunner
 {
     private static final Logger logger = LoggerFactory.getLogger(Browser.class);
-    
+
     private static Browser INSTANCE;
     private static final AtomicBoolean instanceWaiter = new AtomicBoolean();
-    
+
     public static Browser getInstance()
     {
         return INSTANCE;
     }
-    
+
     private final Process process;
     private final ServerSocket server;
     private final Socket socket;
-    
+
     private boolean running = true;
-    
+
     public static Browser createBrowser() throws IOException, InterruptedException
     {
         if (INSTANCE != null)
         {
             return INSTANCE;
         }
-        
-        ServerSocket server = new ServerSocket(BrowserConstants.PORT, 50, InetAddress.getByName(null));
+
+        ServerSocket server = new ServerSocket(BrowserConstants.PORT, 50, InetAddress
+                .getByName(null));
         logger.debug("Server started.");
-        
+
         int startExit;
         Process browserProcess = launchBrowser();
         /*
@@ -58,7 +61,8 @@ public class Browser extends MessageRunner
             if (startExit != 0)
             {
                 logger.error("Error in browser launch (exit code {})", startExit);
-                try (Scanner scanner = new Scanner(browserProcess.getErrorStream()))
+                try (Scanner scanner = new Scanner(browserProcess
+                        .getErrorStream()))
                 {
                     while (scanner.hasNextLine())
                     {
@@ -69,7 +73,7 @@ public class Browser extends MessageRunner
             }
         }
         logger.debug("Browser started.");
-        
+
         ConnectException connErr = null;
         logger.debug("Attempting connection");
         Socket socket = server.accept();
@@ -102,26 +106,28 @@ public class Browser extends MessageRunner
         notifyAllInstance();
         return INSTANCE;
     }
-    
+
     private Browser(Socket socket, ServerSocket server, Process process) throws IOException
     {
-        super("BrowserRunner", socket.getInputStream(), socket.getOutputStream());
+        super("BrowserRunner", socket.getInputStream(), socket
+                .getOutputStream());
         this.socket = socket;
         this.server = server;
         this.process = process;
     }
-    
+
     @Override
     protected boolean onRun()
     {
-        if (!socket.isConnected() || socket.isClosed() || socket.isInputShutdown() || socket.isOutputShutdown())
+        if (!socket.isConnected() || socket.isClosed() || socket
+                .isInputShutdown() || socket.isOutputShutdown())
         {
             logger.debug("Socket closed, shutting down");
             return true;
         }
         return !this.running;
     }
-    
+
     @Override
     protected void onClose()
     {
@@ -150,55 +156,64 @@ public class Browser extends MessageRunner
             }
         }
     }
-    
+
     /**
      * Utility method for launching a browser instance
      *
-     * @throws IOException - Thrown if there is a problem launching the browser.
+     * @throws IOException - Thrown if there is a problem launching the
+     *                     browser.
      */
-    private static Process launchBrowser() throws IOException
+    private static Process launchBrowser() throws IOException, InterruptedException
     {
         Process process = null;
         String os = System.getProperty("os.name").toLowerCase();
         String arch = System.getProperty("os.arch").toLowerCase();
         String args;
         File browserDir = new File(System.getProperty("user.dir"), "firefox");
-        File profileDir = new File(System.getProperty("user.dir"), "profile");
-        profileDir.mkdir();
         if (!browserDir.isDirectory())
         {
-            /*
-             * For some reason, the above maps to the interface project module, rather than the root project.
-             */
-            browserDir = new File(new File(System.getProperty("user.dir")).getParent(), "firefox");
+            browserDir = new File(new File(System.getProperty("user.dir"))
+                    .getParent(), "firefox");
         }
-        
-//        args = " -profile \"" + profileDir.getAbsolutePath() + "\"";
-        args = "";
-        System.out.println(profileDir);
+        File profileDir = new File(System.getProperty("user.dir"), "profile");
+        if (!profileDir.exists())
+        {
+            profileDir.mkdir();
+        }
+
+//        args = " -no-remote -profile \"" + profileDir.getAbsolutePath() + "\"";
+        args = " -no-remote -P Universal";
         logger.info("Running on {} {}", os, arch);
 //        System.getProperties().entrySet().stream().forEach(entry -> logger.info("{}: {}", entry.getKey(), entry.getValue()));
+        File firefox = null;
         if (os.contains("windows"))
         {
-            process = Runtime.getRuntime().exec(new File(browserDir, "firefox.exe").getAbsolutePath() + args);
+            firefox = new File(browserDir, "firefox.exe");
         }
         else if (os.contains("linux"))
         {
-            process = Runtime.getRuntime().exec(new File(browserDir, "firefox").getAbsolutePath() + args);
+            firefox = new File(browserDir, "firefox");
+        }
+        if (firefox != null)
+        {
+            firefox = firefox.getAbsoluteFile();
+            Runtime.getRuntime().exec(firefox + " -CreateProfile Universal").waitFor();
+            process = Runtime.getRuntime().exec(firefox
+                    .getAbsolutePath() + args);
         }
         if (process == null)
         {
             throw new IOException("Could not find Firefox installation for OS " + os + " " + arch);
         }
-        
+
         return process;
     }
-    
+
     public static void notifyInstance()
     {
         instanceWaiter.notify();
     }
-    
+
     public static void notifyAllInstance()
     {
         synchronized (instanceWaiter)
@@ -206,7 +221,7 @@ public class Browser extends MessageRunner
             instanceWaiter.notifyAll();
         }
     }
-    
+
     public static void waitInstance() throws InterruptedException
     {
         synchronized (instanceWaiter)
@@ -214,7 +229,7 @@ public class Browser extends MessageRunner
             instanceWaiter.wait();
         }
     }
-    
+
     public static void waitInstance(long timeoutMillis) throws InterruptedException
     {
         synchronized (instanceWaiter)
@@ -222,7 +237,7 @@ public class Browser extends MessageRunner
             instanceWaiter.wait(timeoutMillis);
         }
     }
-    
+
     public static void waitInstance(long timeoutMillis, int nanos) throws InterruptedException
     {
         synchronized (instanceWaiter)

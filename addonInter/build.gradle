@@ -16,9 +16,9 @@ plugins {
 }
 
 configurations {
-    addon {
-        canBeConsumed = false
-        canBeResolved = true
+    nativeBuild {
+        canBeConsumed = true
+        canBeResolved = false
     }
 }
 
@@ -27,84 +27,6 @@ repositories {
     mavenCentral()
     flatDir {
         dirs new File(rootDir, 'libs')
-    }
-}
-
-/**
- * Creates an addon manifest for running
- */
-abstract class BuildManifest extends DefaultTask {
-    @InputDirectory
-    final abstract DirectoryProperty inputFile = project.objects.directoryProperty()
-    @OutputDirectory
-    final abstract DirectoryProperty manifestDir = project.objects.directoryProperty().convention(project.layout.buildDirectory.dir("manifests"))
-    @OutputFiles
-    final abstract FileCollection manifests = project.objects.fileCollection()
-
-    @TaskAction
-    void join() {
-        manifestDir.get().asFile.mkdir()
-        println "Making build directories!"
-        String addonName, addonDescription, extensionId
-        File manifest
-        File startupScript
-        File binFiles = new File(inputFile.get().asFile, "bin")
-        Stream<File> files = Arrays.stream(binFiles.listFiles())
-        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-            startupScript = files.filter(file -> file.getName().endsWith(".bat")).findFirst().get()
-        } else if (Os.isFamily(Os.FAMILY_UNIX)) {
-            startupScript = files.filter(file -> !file.getName().endsWith(".sh")).findFirst().get()
-        } else {
-            throw new RuntimeException("Unknown OS family")
-        }
-        HashSet<File> manifestSet = new HashSet<>()
-        for (Dependency dep : project.configurations.addon.dependencies) {
-            addonName = dep.dependencyProject.extension.name.get()
-            addonDescription = dep.dependencyProject.extension.description.get()
-            extensionId = dep.dependencyProject.extension.id.get()
-            manifest = manifestDir.get().file("${addonName}.json").asFile
-            manifest.createNewFile()
-            println manifest
-            manifest.text = "{\n" +
-                    "  \"name\": \"$addonName\",\n" +
-                    "  \"description\": \"$addonDescription\",\n" +
-                    "  \"path\": \"" + startupScript.getAbsolutePath().replace("\\", "\\\\") + "\",\n" +
-                    "  \"type\": \"stdio\",\n" +
-                    "  \"allowed_extensions\": [\"$extensionId\"]\n" +
-                    "}"
-            manifestSet.add(manifest)
-        }
-        manifests.setFrom(manifestSet)
-        println manifests.files
-    }
-}
-
-/**
- *
- */
-abstract class InstallAddon extends DefaultTask {
-    @InputDirectory
-    final abstract DirectoryProperty inputFile = project.objects.directoryProperty()
-
-    @TaskAction
-    void join() {
-//        File file = inputFile.get().asFile
-        for (File file: inputFile.asFileTree) {
-            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-                String name = file.name.substring(0, file.name.lastIndexOf('.'))
-                Process p = Runtime.getRuntime()
-                        .exec("REG DELETE HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\${name} /f ")
-                p.waitFor()
-                p = Runtime.getRuntime()
-                        .exec("REG ADD HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\${name} /ve /d \""
-                                + file.getAbsolutePath() + "\" /f ")
-                p.waitFor()
-            } else if (Os.isFamily(Os.FAMILY_MAC)) {
-                Files.copy(file.toPath(), Paths.get(System.getProperty("user.home"), "Library/Application Support/Mozilla/NativeMessagingHosts", file.getName()), StandardCopyOption.REPLACE_EXISTING)
-            } else if (Os.isFamily(Os.FAMILY_UNIX)) {
-                Files.copy(file.toPath(), Paths.get(System.getProperty("user.home"), ".mozilla/native-messaging-hosts", file.getName()), StandardCopyOption.REPLACE_EXISTING)
-            }
-        }
     }
 }
 
@@ -126,19 +48,13 @@ dependencies {
     // testCompile dependency to testCompile 'org.testng:testng:6.8.1' and add
     // 'test.useTestNG()' to your build script.
     testImplementation 'junit:junit:4.12'
-
-    addon(project(":add-on"))
 }
-
-tasks.register('buildManifest', BuildManifest) {
-    dependsOn installDist
-    inputFile = installDist.outputs.getFiles().getSingleFile()
-}
-
-tasks.register('installAddon', InstallAddon) {
-    inputFile = buildManifest.manifestDir
-}
-assemble.dependsOn(installAddon)
 
 // Define the main class for the application
 mainClassName = defaultPackage + '.addon.Main'
+
+artifacts {
+    nativeBuild(installDist.destinationDir) {
+        builtBy installDist
+    }
+}

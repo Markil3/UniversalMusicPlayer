@@ -217,6 +217,22 @@ task movePolicies(type: Copy) {
 	dependsOn setupProfile
 	from files("browserConf")
 	into "$rootDir/firefox/"
+	filesMatching('**/policies.json'){
+		def pre = ""
+		for (File addon: configurations.addon.resolve())
+		{
+			if (pre.length() > 0)
+			{
+				pre += ",\n"
+			}
+			pre += "\"" + addon.name.substring(0, addon.name.lastIndexOf('.')) + "\": {\n"
+			pre += "\"installation_mode\": \"forced_install\","
+			pre += "\"install_url\": \"" + addon.toURI().toString() + "\""
+			pre += "}"
+		}
+		println "Expanding ${pre}"
+		expand(preinstalled: pre)
+	}
 	doLast {
 		println "Making policies firefox!"
 	}

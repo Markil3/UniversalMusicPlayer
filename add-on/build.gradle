@@ -10,10 +10,7 @@ configurations {
         canBeConsumed = true
         canBeResolved = false
     }
-    nativeApp {
-        canBeConsumed = false
-        canBeResolved = true
-    }
+    nativeApp.extendsFrom runtime
 }
 
 /**
@@ -21,7 +18,9 @@ configurations {
  */
 interface ExtensionData {
     Property<String> getName()
+
     Property<String> getDescription()
+
     Property<String> getId()
 }
 
@@ -31,13 +30,116 @@ extension.description = "A link between the Universal Music Player and the web b
 extension.id = "universalmusic@regis.edu"
 
 /**
+ * Creates an addon manifest for running
+ */
+abstract class BuildManifest extends DefaultTask {
+    @OutputFile
+    final abstract RegularFileProperty manifests = project.objects.fileProperty()
+
+    @TaskAction
+    void join() {
+        println "Making build directories!"
+        String addonName = project.extension.name.get(), addonDescription = project.extension.description.get(), extensionId = project.extension.id.get()
+        File manifest
+        File startupScript
+        for (Dependency dep : project.configurations.nativeApp.dependencies) {
+            File binFiles = new File(dep.dependencyProject.installDist.outputs.getFiles().getSingleFile(), "bin")
+            Stream<File> files = Arrays.stream(binFiles.listFiles())
+            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                startupScript = files.filter(file -> file.getName().endsWith(".bat")).findFirst().get()
+            } else if (Os.isFamily(Os.FAMILY_UNIX)) {
+                startupScript = files.filter(file -> !file.getName().endsWith(".sh")).findFirst().get()
+            } else {
+                throw new RuntimeException("Unknown OS family")
+            }
+            manifests.get().asFile.text = "{\n" +
+                    "  \"name\": \"$addonName\",\n" +
+                    "  \"description\": \"$addonDescription\",\n" +
+                    "  \"path\": \"" + startupScript.getAbsolutePath().replace("\\", "\\\\") + "\",\n" +
+                    "  \"type\": \"stdio\",\n" +
+                    "  \"allowed_extensions\": [\"$extensionId\"]\n" +
+                    "}"
+            break
+        }
+    }
+
+}
+
+/**
+ *
+ */
+abstract class InstallAddon extends DefaultTask {
+    @InputFile
+    @SkipWhenEmpty
+    final abstract RegularFileProperty inputFile = project.objects.fileProperty()
+
+    @TaskAction
+    void join() {
+        File file = inputFile.get().asFile
+        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+            String name = file.name.substring(0, file.name.lastIndexOf('.'))
+            Process p = Runtime.getRuntime()
+                    .exec("REG DELETE HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\${name} /f ")
+            p.waitFor()
+            p = Runtime.getRuntime()
+                    .exec("REG ADD HKEY_CURRENT_USER\\SOFTWARE\\Mozilla\\NativeMessagingHosts\\${name} /ve /d \""
+                            + file.getAbsolutePath() + "\" /f ")
+            p.waitFor()
+        } else if (Os.isFamily(Os.FAMILY_MAC)) {
+            Files.copy(file.toPath(), Paths.get(System.getProperty("user.home"), "Library/Application Support/Mozilla/NativeMessagingHosts", file.getName()), StandardCopyOption.REPLACE_EXISTING)
+        } else if (Os.isFamily(Os.FAMILY_UNIX)) {
+            Files.copy(file.toPath(), Paths.get(System.getProperty("user.home"), ".mozilla/native-messaging-hosts", file.getName()), StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+}
+
+dependencies {
+    nativeApp project(path: ":addonInter", configuration: 'nativeBuild')
+}
+
+tasks.register('buildManifest', BuildManifest) {
+    manifests = new File(buildDir, "${extension.name.get()}.json")
+}
+
+def installAddon = tasks.register('installAddon', InstallAddon) {
+    inputFile = buildManifest.manifests
+}
+
+/**
  * Creates a packaged (albiet unsigned) Firefox addon from the src/main directory.
  */
 tasks.register('zipAddon', Zip) {
+    dependsOn configurations.nativeApp
     archiveName = "${extension.id.get()}.xpi"
     destinationDir = file("$buildDir/lib")
     from("$projectDir/src/addon/javascript", "$projectDir/src/addon/resources")
+    doLast {
+        File profiles
+        File extention
+        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+            profiles = new File(System.getenv("APPDATA"), "Mozilla\\Firefox\\Profiles")
+        } else if (Os.isFamily(Os.FAMILY_MAC)) {
+            profiles = new File(System.getProperty("user.home"), "Library/Application Support/Firefox/Profiles")
+        } else if (Os.isFamily(Os.FAMILY_UNIX)) {
+            profiles = new File(System.getProperty("user.home"), ".mozilla/firefox/")
+        }
+        for (File profile: profiles.listFiles())
+        {
+            if (profile.isDirectory())
+            {
+                extention = new File(profile, "extensions/${extension.id.get()}.xpi")
+                if (extention.exists())
+                {
+                    copy {
+                        from(zipAddon.outputs)
+                        into extention.getParentFile()
+                    }
+                }
+            }
+        }
+    }
 }
+zipAddon.finalizedBy installAddon
 
 tasks.register("clean", Delete) {
     delete "$buildDir"
