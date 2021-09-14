@@ -125,6 +125,18 @@ var listeners = [function (message, returnValue) {
         case "CommandQuit":
             returnValue = quit();
             break;
+        case "CommandError":
+            console.error("Error message", message);
+            if (message.forward)
+            {
+                returnValue = queryTab(message);
+            }
+            else
+            {
+                throw new TypeError("This is a background test");
+                returnValue = false;
+            }
+            break;
         }
     }
     else if (message == "quit")
@@ -202,7 +214,19 @@ interfacePort.onMessage.addListener((message) => {
         console.log("Sending ", returnValue)
         interfacePort.postMessage(returnValue);
     }).catch(error => {
-        console.error("Error in evaluating message: ", error)
+//        console.error("Error in evaluating message: ", error);
+        interfacePort.postMessage({
+            "messageNum": message.messageNum,
+            "message": {
+                "type": "edu.regis.universeplayer.browserCommands.CommandReturn",
+                "returnValue": null,
+                "confirmation": {
+                    type: "edu.regis.universeplayer.browserCommands.CommandConfirmation",
+                    message: "Error in executing request",
+                    errorCode: JSON.parse(JSON.stringify(error, Object.getOwnPropertyNames(error)))
+                }
+            }
+        });
     });
 });
 

@@ -21,17 +21,17 @@ import java.util.concurrent.Future;
 public class MessageHandler implements Runnable, MessageSerializer
 {
     private final Logger logger;
-    
+
     public final String name;
-    
+
     private final InputStream input;
     private final OutputStream output;
-    
+
     private final ExecutorService executor;
     private final LinkedList<MessageListener> listeners = new LinkedList<>();
     protected final HashMap<Integer, Future<Object>> messageResponses = new HashMap<>();
     protected final Queue<Object> updates = new LinkedList<>();
-    
+
     /**
      * Creates a message handler.
      *
@@ -47,13 +47,13 @@ public class MessageHandler implements Runnable, MessageSerializer
         this.output = output;
         this.executor = Executors.newCachedThreadPool();
     }
-    
+
     @Override
     public Logger getLogger()
     {
         return logger;
     }
-    
+
     /**
      * Called at the beginning of every loop to do extra processing and check to see if we can still run.
      *
@@ -63,13 +63,13 @@ public class MessageHandler implements Runnable, MessageSerializer
     {
         return false;
     }
-    
+
     @Override
     public void run()
     {
         BufferedInputStream browserIn = null;
         BufferedOutputStream browserOut = null;
-        
+
         byte[][] message;
         byte[] messageByte;
         Object messageOb;
@@ -77,12 +77,12 @@ public class MessageHandler implements Runnable, MessageSerializer
         ByteBuffer numBuffer = ByteBuffer.allocate(4);
         HashSet<Integer> toRemove = new HashSet<>();
         boolean running = true;
-        
+
         try
         {
             browserIn = new BufferedInputStream(this.input);
             browserOut = new BufferedOutputStream(this.output);
-            
+
             while (!this.onRun() && running)
             {
                 try
@@ -99,22 +99,32 @@ public class MessageHandler implements Runnable, MessageSerializer
                         {
                             numBuffer.clear();
                             numBuffer.put(message[0]);
-                            messageOb = this.deserializeObject(message[1]);
-                            messageResponse = this.triggerListeners(messageOb);
+                            try
+                            {
+                                messageOb = this.deserializeObject(message[1]);
+                            }
+                            catch (IOException | ClassNotFoundException e)
+                            {
+                                logger.error("Could not read message", e);
+                                messageOb = this.getErrorObject(e);
+                            }
+                            messageResponse = this
+                                    .triggerListeners(messageOb);
                             synchronized (this.messageResponses)
                             {
                                 numBuffer.clear();
-                                this.messageResponses.put(numBuffer.getInt(), messageResponse);
+                                this.messageResponses.put(numBuffer
+                                        .getInt(), messageResponse);
                             }
                         }
                     }
                 }
-                catch (IOException | ClassNotFoundException e)
+                catch (IOException e)
                 {
                     logger.error("Could not retrieve message", e);
                     running = false;
                 }
-                
+
                 /*
                  * Returns any finished responses.
                  */
@@ -143,7 +153,7 @@ public class MessageHandler implements Runnable, MessageSerializer
                         toRemove.clear();
                     }
                 }
-                
+
                 /*
                  * Send in any updates
                  */
@@ -218,14 +228,14 @@ public class MessageHandler implements Runnable, MessageSerializer
             }
         }
     }
-    
+
     /**
      * Callback for when closing the application.
      */
     protected void onClose()
     {
     }
-    
+
     /**
      * Triggers the message listeners.
      *
@@ -254,7 +264,7 @@ public class MessageHandler implements Runnable, MessageSerializer
         });
         return returnVal;
     }
-    
+
     /**
      * Adds a message listener
      *
@@ -268,7 +278,7 @@ public class MessageHandler implements Runnable, MessageSerializer
             this.listeners.add(listener);
         }
     }
-    
+
     /**
      * Sends an object through the handler as an update not associated with any message.
      *
@@ -281,7 +291,7 @@ public class MessageHandler implements Runnable, MessageSerializer
             this.updates.add(object);
         }
     }
-    
+
     /**
      * Checks to see if a listener has been added to the list.
      *
@@ -295,7 +305,7 @@ public class MessageHandler implements Runnable, MessageSerializer
             return this.listeners.contains(listener);
         }
     }
-    
+
     /**
      * Removes a message listener from the list.
      *
@@ -308,7 +318,7 @@ public class MessageHandler implements Runnable, MessageSerializer
             this.listeners.remove(listener);
         }
     }
-    
+
     /**
      * A message listener is called when a message is sent from the remote.
      *

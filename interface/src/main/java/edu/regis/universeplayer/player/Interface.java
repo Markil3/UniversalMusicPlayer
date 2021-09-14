@@ -7,6 +7,8 @@ package edu.regis.universeplayer.player;
 import edu.regis.universeplayer.Player;
 import edu.regis.universeplayer.browser.Browser;
 import edu.regis.universeplayer.browser.BrowserPlayer;
+import edu.regis.universeplayer.browserCommands.CommandError;
+import edu.regis.universeplayer.browserCommands.QueryFuture;
 import edu.regis.universeplayer.data.InternetSong;
 import edu.regis.universeplayer.data.Queue;
 import edu.regis.universeplayer.data.*;
@@ -28,9 +30,11 @@ import java.util.Collection;
 import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 /**
- * The Interface class serves as the primary GUI that the player interacts with.
+ * The Interface class serves as the primary GUI that the player interacts
+ * with.
  *
  * @author William Hubbard
  * @version 0.1
@@ -40,7 +44,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     //    static {
 //        Locale.setDefault(new Locale("es", "ES"));
 //    }
-    private static final Logger logger = LoggerFactory.getLogger(Interface.class);
+    private static final Logger logger = LoggerFactory
+            .getLogger(Interface.class);
     private static final ResourceBundle langs = ResourceBundle
             .getBundle("lang.interface", Locale.getDefault());
 
@@ -119,8 +124,10 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 inter.players.add(browserPlayer = new BrowserPlayer());
                 logger.debug("Sending ping");
                 browser.sendObject("ping");
-                Runtime.getRuntime().addShutdownHook(new Thread(browserPlayer::close));
-                Player.REGISTERED_PLAYERS.put(InternetSong.class, browserPlayer);
+                Runtime.getRuntime()
+                       .addShutdownHook(new Thread(browserPlayer::close));
+                Player.REGISTERED_PLAYERS
+                        .put(InternetSong.class, browserPlayer);
 
 //                LinkedList<Future<Object>> pingRequests = new LinkedList<>();
 //                for (int i = 0; i < 20; i++)
@@ -155,7 +162,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         {
             logger.error("Could not open browser background", e);
             JOptionPane
-                    .showMessageDialog(inter != null && inter.isVisible() ? inter : null, e, langs
+                    .showMessageDialog(inter != null && inter
+                            .isVisible() ? inter : null, e, langs
                             .getString("error.generic"), JOptionPane.ERROR_MESSAGE);
         }
     }
@@ -221,7 +229,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
             {
                 if (!commDir.getParentFile().mkdir())
                 {
-                    logger.error("Could not create shared directory {}", commDir.getParent());
+                    logger.error("Could not create shared directory {}", commDir
+                            .getParent());
                 }
             }
             if (!commDir.exists())
@@ -262,7 +271,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     {
         AbstractAction action;
 
-        this.actions.put("refresh", action = new AbstractAction(langs.getString("actions.refresh"))
+        this.actions.put("refresh", action = new AbstractAction(langs
+                .getString("actions.refresh"))
         {
             @Override
             public void actionPerformed(ActionEvent e)
@@ -302,7 +312,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         });
         action.putValue(Action.MNEMONIC_KEY, KeyEvent.VK_E);
 
-        this.actions.put("exit", action = new AbstractAction(langs.getString("actions.exit"))
+        this.actions.put("exit", action = new AbstractAction(langs
+                .getString("actions.exit"))
         {
             @Override
             public void actionPerformed(ActionEvent e)
@@ -316,7 +327,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         });
         action.putValue(Action.MNEMONIC_KEY, KeyEvent.VK_X);
 
-        this.actions.put("logs", action = new AbstractAction(langs.getString("actions.logs"))
+        this.actions.put("logs", action = new AbstractAction(langs
+                .getString("actions.logs"))
         {
             @Override
             public void actionPerformed(ActionEvent e)
@@ -330,9 +342,114 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 }
             }
         });
-        action.putValue(Action.ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_F12, 0));
+        action.putValue(Action.ACCELERATOR_KEY, KeyStroke
+                .getKeyStroke(KeyEvent.VK_F12, 0));
 
-        this.actions.put("about", action = new AbstractAction(langs.getString("actions.about"))
+        this.actions.put("debug.error", action =
+                new AbstractAction(langs.getString("actions.debug.error"))
+                {
+                    @Override
+                    public void actionPerformed(ActionEvent e)
+                    {
+                        if (this.isEnabled())
+                        {
+                            new SwingWorker<Void, Void>()
+                            {
+                                /**
+                                 * Computes
+                                 * a
+                                 * result,
+                                 * or
+                                 * throws
+                                 * an
+                                 * exception
+                                 * if
+                                 * unable
+                                 * to
+                                 * do
+                                 * so.
+                                 *
+                                 * <p>
+                                 * Note
+                                 * that
+                                 * this
+                                 * method
+                                 * is
+                                 * executed
+                                 * only
+                                 * once.
+                                 *
+                                 * <p>
+                                 * Note:
+                                 * this
+                                 * method
+                                 * is
+                                 * executed
+                                 * in
+                                 * a
+                                 * background
+                                 * thread.
+                                 *
+                                 * @return the computed result
+                                 * @throws Exception if unable to compute a result
+                                 */
+                                @Override
+                                protected Void doInBackground() throws Exception
+                                {
+                                    Interface.this.players.stream()
+                                                          .filter(p -> p instanceof BrowserPlayer)
+                                                          .map(p -> (BrowserPlayer) p)
+                                                          .findFirst()
+                                                          .ifPresentOrElse(p -> {
+                                                              logger.debug("Throwing " +
+                                                                      "error");
+                                                              QueryFuture<Void> command = p
+                                                                      .throwError((false));
+                                                              try
+                                                              {
+                                                                  if (!command
+                                                                          .getConfirmation()
+                                                                          .wasSuccessful())
+                                                                  {
+                                                                      logger.error("Could not run command",
+                                                                              command.getConfirmation()
+                                                                                     .getError());
+                                                                      JOptionPane
+                                                                              .showMessageDialog(Interface.this,
+                                                                                      command.getConfirmation()
+                                                                                             .getError(),
+                                                                                      command.getConfirmation()
+                                                                                             .getMessage(),
+                                                                                      JOptionPane.ERROR_MESSAGE);
+                                                                  }
+                                                              }
+                                                              catch (ExecutionException | InterruptedException executionException)
+                                                              {
+                                                                  logger.error("Error" +
+                                                                          " creating " +
+                                                                          "debug " +
+                                                                          "message", executionException);
+                                                                  JOptionPane
+                                                                          .showMessageDialog(Interface.this, executionException
+                                                                                  .getMessage(), langs
+                                                                                  .getString(
+                                                                                          "error.command"), JOptionPane.ERROR_MESSAGE);
+                                                              }
+                                                          }, () -> JOptionPane
+                                                                  .showMessageDialog(Interface.this, langs
+                                                                          .getString("error.browser.null"), langs
+                                                                          .getString("error.debug.error"), JOptionPane.ERROR_MESSAGE));
+                                    return null;
+                                }
+                            }.execute();
+                        }
+                    }
+                });
+        action.putValue(Action.ACCELERATOR_KEY, KeyStroke
+                .getKeyStroke(KeyEvent.VK_F12, 0));
+
+        this.actions.put("about", action = new AbstractAction(langs
+                .getString("actions.about"))
         {
             @Override
             public void actionPerformed(ActionEvent e)
@@ -345,7 +462,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         });
 
         this.actions
-                .put("view.all", action = new AbstractAction(langs.getString("actions.view.all"))
+                .put("view.all", action = new AbstractAction(langs
+                        .getString("actions.view.all"))
                 {
                     @Override
                     public void actionPerformed(ActionEvent e)
@@ -521,7 +639,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     protected void constructWindow()
     {
         JMenuBar toolbar;
-        JMenu fileMenu, viewMenu, collectionsMenu, playbackMenu, helpMenu;
+        JMenu fileMenu, viewMenu, collectionsMenu, playbackMenu, helpMenu,
+                debugMenu;
 
         this.setTitle(langs.getString("title"));
         this.getContentPane().setLayout(new BorderLayout());
@@ -569,6 +688,10 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         helpMenu.setMnemonic(KeyEvent.VK_H);
         toolbar.add(helpMenu);
 
+        debugMenu = new JMenu(langs.getString("menu.debug.title"));
+        debugMenu.setMnemonic(KeyEvent.VK_D);
+        helpMenu.add(debugMenu);
+
         fileMenu.add(new JMenuItem(actions.get("refresh")));
 
         fileMenu.add(actions.get("addExternal"));
@@ -590,6 +713,9 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
 
         helpMenu.add(new JMenuItem(actions.get("logs")));
 
+        helpMenu.add(debugMenu);
+        debugMenu.add(new JMenuItem(actions.get("debug.error")));
+
         helpMenu.add(new JMenuItem(actions.get("about")));
 
         this.setJMenuBar(toolbar);
@@ -606,15 +732,18 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         ((SortingFocusTraversalPolicy) this.getFocusTraversalPolicy())
                 .setImplicitDownCycleTraversal(true);
         this.setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS, Set
-                .of(AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_DOWN, 0), AWTKeyStroke
+                .of(AWTKeyStroke
+                        .getAWTKeyStroke(KeyEvent.VK_DOWN, 0), AWTKeyStroke
                         .getAWTKeyStroke(KeyEvent.VK_RIGHT, 0)));
         this.setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS, Set
-                .of(AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_UP, 0), AWTKeyStroke
+                .of(AWTKeyStroke
+                        .getAWTKeyStroke(KeyEvent.VK_UP, 0), AWTKeyStroke
                         .getAWTKeyStroke(KeyEvent.VK_LEFT, 0)));
         this.setFocusTraversalKeys(KeyboardFocusManager.UP_CYCLE_TRAVERSAL_KEYS, Set
                 .of(AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_TAB, 0)));
         this.setFocusTraversalKeys(KeyboardFocusManager.DOWN_CYCLE_TRAVERSAL_KEYS, Set
-                .of(AWTKeyStroke.getAWTKeyStroke(KeyEvent.VK_TAB, KeyEvent.SHIFT_DOWN_MASK)));
+                .of(AWTKeyStroke
+                        .getAWTKeyStroke(KeyEvent.VK_TAB, KeyEvent.SHIFT_DOWN_MASK)));
     }
 
     @Override
@@ -752,7 +881,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         else
         {
             int index = -1;
-            Component[] children = ((Container) e.getComponent()).getComponents();
+            Component[] children = ((Container) e.getComponent())
+                    .getComponents();
             for (int i = 0, l = children.length; index == -1 && i < l; i++)
             {
                 if (children[i] == e.getOppositeComponent())

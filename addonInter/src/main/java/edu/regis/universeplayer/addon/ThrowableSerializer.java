@@ -21,7 +21,7 @@ public class ThrowableSerializer implements JsonSerializer<Throwable>, JsonDeser
         {
             stack.add(context.serialize(trace));
         }
-        ob.add("trace", stack);
+        ob.add("stack", stack);
         JsonArray suppressed = new JsonArray();
         for (Throwable throwable: src.getSuppressed())
         {
@@ -35,19 +35,37 @@ public class ThrowableSerializer implements JsonSerializer<Throwable>, JsonDeser
     public Throwable deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException
     {
         JsonObject ob = json.getAsJsonObject();
-        Throwable throwable = new Throwable(ob.get("message").getAsString(), context.deserialize(ob.get("cause"), typeOfT));
-        throwable.initCause(context.deserialize(ob.get("cause"), Throwable.class));
-        JsonArray traceJson = ob.getAsJsonArray("trace");
-        StackTraceElement[] trace = new StackTraceElement[traceJson.size()];
-        for (int i = 0; i < trace.length; i++)
+        Throwable cause = context.deserialize(ob.get("cause"), typeOfT);
+        Throwable throwable;
+        if (cause == null)
         {
-            trace[i] = context.deserialize(traceJson.get(i), StackTraceElement.class);
+            throwable = new Throwable(ob.get("message").getAsString());
         }
-        throwable.setStackTrace(trace);
-        JsonArray suppressed = ob.getAsJsonArray("suppressed");
-        for (JsonElement el: suppressed)
+        else
         {
-            throwable.addSuppressed(context.deserialize(el, Throwable.class));
+            throwable = new Throwable(ob.get("message").getAsString(), context
+                    .deserialize(ob.get("cause"), typeOfT));
+            throwable.initCause(context.deserialize(ob.get("cause"), Throwable.class));
+        }
+        JsonArray traceJson = ob.getAsJsonArray("stack");
+        if (traceJson != null)
+        {
+            StackTraceElement[] trace = new StackTraceElement[traceJson.size()];
+            for (int i = 0; i < trace.length; i++)
+            {
+                trace[i] = context
+                        .deserialize(traceJson.get(i), StackTraceElement.class);
+            }
+            throwable.setStackTrace(trace);
+        }
+        JsonArray suppressed = ob.getAsJsonArray("suppressed");
+        if (suppressed != null)
+        {
+            for (JsonElement el : suppressed)
+            {
+                throwable.addSuppressed(context
+                        .deserialize(el, Throwable.class));
+            }
         }
         return throwable;
     }

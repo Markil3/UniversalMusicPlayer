@@ -12,6 +12,7 @@ import edu.regis.universeplayer.browserCommands.*;
 import edu.regis.universeplayer.data.InternetSong;
 import edu.regis.universeplayer.data.PlaybackEvent;
 import edu.regis.universeplayer.data.Song;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,14 +29,15 @@ import java.util.concurrent.*;
  */
 public class BrowserPlayer implements Player<InternetSong>, UpdateListener
 {
-    private static final Logger logger = LoggerFactory.getLogger(BrowserPlayer.class);
-    
+    private static final Logger logger = LoggerFactory
+            .getLogger(BrowserPlayer.class);
+
     private final LinkedList<PlaybackListener> listeners = new LinkedList<>();
-    
+
     private InternetSong currentSong;
-    
+
     private Browser browserRef = null;
-    
+
     private Browser getBrowser()
     {
         if (browserRef == null)
@@ -56,19 +58,20 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
         }
         return browserRef;
     }
-    
+
     @Override
     public Song getCurrentSong()
     {
         return this.currentSong;
     }
-    
+
     @Override
     public QueryFuture<Void> loadSong(InternetSong song)
     {
         try
         {
-            return new ForwardedFuture(getBrowser().sendObject(new CommandLoadSong(song.location)));
+            return new ForwardedFuture(getBrowser()
+                    .sendObject(new CommandLoadSong(song.location)));
         }
         catch (IOException e)
         {
@@ -76,7 +79,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             return null;
         }
     }
-    
+
     /**
      * Tells the browser process to shut down.
      */
@@ -85,7 +88,8 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
     {
         try
         {
-            QueryFuture<Void> future = new ForwardedFuture(getBrowser().sendObject(new CommandQuit()));
+            QueryFuture<Void> future = new ForwardedFuture(getBrowser()
+                    .sendObject(new CommandQuit()));
             return future;
         }
         catch (IOException e)
@@ -94,7 +98,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             return null;
         }
     }
-    
+
     /**
      * Adds a listener for playback status updates.
      *
@@ -105,7 +109,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
     {
         this.listeners.add(listener);
     }
-    
+
     /**
      * Checks to see if a listener has been added.
      *
@@ -117,7 +121,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
     {
         return this.listeners.contains(listener);
     }
-    
+
     /**
      * Removes a listener for playback status updates.
      *
@@ -128,13 +132,14 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
     {
         this.listeners.remove(listener);
     }
-    
+
     @Override
     public QueryFuture<Void> play()
     {
         try
         {
-            return new ForwardedFuture(getBrowser().sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PLAY)));
+            return new ForwardedFuture(getBrowser()
+                    .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PLAY)));
         }
         catch (IOException e)
         {
@@ -142,13 +147,14 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             return null;
         }
     }
-    
+
     @Override
     public QueryFuture<Void> pause()
     {
         try
         {
-            return new ForwardedFuture(getBrowser().sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE)));
+            return new ForwardedFuture(getBrowser()
+                    .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE)));
         }
         catch (IOException e)
         {
@@ -156,13 +162,14 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             return null;
         }
     }
-    
+
     @Override
     public QueryFuture<Void> togglePlayback()
     {
         try
         {
-            return new ForwardedFuture(getBrowser().sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE)));
+            return new ForwardedFuture(getBrowser()
+                    .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE)));
         }
         catch (IOException e)
         {
@@ -170,7 +177,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             return null;
         }
     }
-    
+
     /**
      * Stops playback of the current song.
      */
@@ -179,7 +186,8 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
     {
         try
         {
-            return new ForwardedFuture(getBrowser().sendObject(new CommandLoadSong((URL) null)));
+            return new ForwardedFuture(getBrowser()
+                    .sendObject(new CommandLoadSong((URL) null)));
         }
         catch (IOException e)
         {
@@ -187,13 +195,14 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             return null;
         }
     }
-    
+
     @Override
     public QueryFuture<Void> seek(float time)
     {
         try
         {
-            return new ForwardedFuture(getBrowser().sendObject(new CommandSeek(time)));
+            return new ForwardedFuture(getBrowser()
+                    .sendObject(new CommandSeek(time)));
         }
         catch (IOException e)
         {
@@ -201,7 +210,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             return null;
         }
     }
-    
+
     /**
      * Obtains the player's current playback status.
      *
@@ -215,54 +224,54 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             Future future = getBrowser().sendObject(new QueryStatus());
             return new QueryFuture<>()
             {
-                
+
                 private CommandReturn<String> getVal() throws ExecutionException, InterruptedException
                 {
                     return ((CommandReturn<String>) future.get());
                 }
-                
+
                 private CommandReturn<String> getVal(long timeout, TimeUnit unit) throws ExecutionException, InterruptedException, TimeoutException
                 {
                     return ((CommandReturn<String>) future.get(timeout, unit));
                 }
-                
+
                 @Override
                 public CommandConfirmation getConfirmation() throws CancellationException, ExecutionException, InterruptedException
                 {
                     return this.getVal().getConfirmation();
                 }
-                
+
                 @Override
                 public CommandConfirmation getConfirmation(long timeout, TimeUnit unit) throws ExecutionException, InterruptedException, TimeoutException
                 {
                     return this.getVal(timeout, unit).getConfirmation();
                 }
-                
+
                 @Override
                 public boolean cancel(boolean mayInterruptIfRunning)
                 {
                     return future.cancel(mayInterruptIfRunning);
                 }
-                
+
                 @Override
                 public boolean isCancelled()
                 {
                     return future.isCancelled();
                 }
-                
+
                 @Override
                 public boolean isDone()
                 {
                     return future.isDone();
                 }
-                
+
                 @Override
                 public PlaybackStatus get() throws InterruptedException, ExecutionException
                 {
                     String value = getVal().getReturnValue();
                     return PlaybackStatus.valueOf(value);
                 }
-                
+
                 @Override
                 public PlaybackStatus get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
                 {
@@ -277,19 +286,40 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             return null;
         }
     }
-    
+
     @Override
     public QueryFuture<Float> getCurrentTime()
     {
         return null;
     }
-    
+
     @Override
     public QueryFuture<Float> getLength()
     {
         return null;
     }
-    
+
+    /**
+     * Causes the browser to throw an error
+     *
+     * @param forward - Whether the error should be thrown from the foreground
+     *                script or the background script.
+     * @return
+     */
+    public QueryFuture<Void> throwError(boolean forward)
+    {
+        try
+        {
+            return new ForwardedFuture(getBrowser()
+                    .sendObject(new CommandError(forward)));
+        }
+        catch (IOException e)
+        {
+            logger.error("Could not send message", e);
+            return null;
+        }
+    }
+
     @Override
     public void onUpdate(Object object, MessageRunner runner)
     {
@@ -300,62 +330,62 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             this.listeners.forEach(l -> l.onPlaybackChanged(status));
         }
     }
-    
+
     private class ForwardedFuture<T> implements QueryFuture<T>
     {
         private final Future<T> future;
-        
+
         ForwardedFuture(Future<T> future)
         {
             this.future = future;
         }
-        
+
         private CommandReturn<T> getVal() throws ExecutionException, InterruptedException
         {
             return ((CommandReturn<T>) this.future.get());
         }
-        
+
         private CommandReturn<T> getVal(long timeout, TimeUnit unit) throws ExecutionException, InterruptedException, TimeoutException
         {
             return ((CommandReturn<T>) this.future.get(timeout, unit));
         }
-        
+
         @Override
         public CommandConfirmation getConfirmation() throws CancellationException, ExecutionException, InterruptedException
         {
             return this.getVal().getConfirmation();
         }
-        
+
         @Override
         public CommandConfirmation getConfirmation(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
         {
             return this.getVal(timeout, unit).getConfirmation();
         }
-        
+
         @Override
         public boolean cancel(boolean mayInterruptIfRunning)
         {
             return this.future.cancel(mayInterruptIfRunning);
         }
-        
+
         @Override
         public boolean isCancelled()
         {
             return this.future.isCancelled();
         }
-        
+
         @Override
         public boolean isDone()
         {
             return this.future.isDone();
         }
-        
+
         @Override
         public T get() throws InterruptedException, ExecutionException
         {
             return this.getVal().getReturnValue();
         }
-        
+
         @Override
         public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
         {

@@ -30,6 +30,9 @@ function handleMessage(message)
             return false;
         case "CommandSeek":
             return seek(message.time);
+        case "CommandError":
+            throw new TypeError("This is a foreground test");
+            return false;
         }
     }
 }

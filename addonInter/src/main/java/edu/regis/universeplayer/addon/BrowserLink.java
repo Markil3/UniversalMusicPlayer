@@ -5,6 +5,8 @@
 package edu.regis.universeplayer.addon;
 
 import com.google.gson.*;
+
+import edu.regis.universeplayer.browserCommands.CommandConfirmation;
 import edu.regis.universeplayer.browserCommands.MessageRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -265,5 +267,11 @@ public class BrowserLink extends MessageRunner
             returnValue[i] = getMessage(message.get(i));
         }
         return returnValue;
+    }
+
+    @Override
+    public Object getErrorObject(Throwable e)
+    {
+        return new CommandConfirmation(e);
     }
 }

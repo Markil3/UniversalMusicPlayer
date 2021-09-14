@@ -12,7 +12,7 @@ import java.nio.ByteBuffer;
 public interface MessageSerializer
 {
     Logger getLogger();
-    
+
     /**
      * Converts an object into a form that can be sent.
      *
@@ -31,13 +31,14 @@ public interface MessageSerializer
             return byteStream.toByteArray();
         }
     }
-    
+
     /**
      * Converts a byte stream into an object.
      *
      * @param message - The message received.
      * @return An object.
-     * @throws IOException            If there is an error in parsing the message.
+     * @throws IOException            If there is an error in parsing the
+     *                                message.
      * @throws ClassNotFoundException If the object is not recognized
      */
     default Object deserializeObject(byte[] message) throws IOException, ClassNotFoundException
@@ -50,12 +51,13 @@ public interface MessageSerializer
             }
         }
     }
-    
+
     /**
      * Writes a message to the output stream.
      *
      * @param out        - The output stream to write to.
-     * @param messageNum - The ID of the message being sent. This will help keep track of responses.
+     * @param messageNum - The ID of the message being sent. This will help keep
+     *                   track of responses.
      * @param message    - The actual message contents to write.
      * @throws IOException Thrown when an exception occures
      */
@@ -86,7 +88,7 @@ public interface MessageSerializer
         out.write(message);
         out.flush();
     }
-    
+
     /**
      * Reads a message from the input stream
      *
@@ -119,7 +121,8 @@ public interface MessageSerializer
         readLength = in.read(lengthBuffer.array());
         if (readLength == 0)
         {
-            getLogger().error("Malformed message, could not get message length.");
+            getLogger()
+                    .error("Malformed message, could not get message length.");
             return null;
         }
         message = new byte[lengthBuffer.getInt()];
@@ -129,9 +132,21 @@ public interface MessageSerializer
         readLength = in.read(message);
         if (readLength < message.length)
         {
-            getLogger().warn("Message shorter than reported (expected {} bytes, got {} bytes)", message.length, readLength);
+            getLogger()
+                    .warn("Message shorter than reported (expected {} bytes, got {} bytes)", message.length, readLength);
         }
         getLogger().trace("Reading message");
-        return new byte[][] {messageNum, message};
+        return new byte[][]{messageNum, message};
+    }
+
+    /**
+     * This method is called when an error in deserialization occurs.
+     *
+     * @param e - The error thrown.
+     * @return An object to return to listeners in the event of a read error.
+     */
+    default Object getErrorObject(Throwable e)
+    {
+        return e;
     }
 }
