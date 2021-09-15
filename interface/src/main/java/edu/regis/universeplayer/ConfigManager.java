@@ -9,12 +9,18 @@ import java.io.File;
 
 public class ConfigManager
 {
+    /**
+     * The port the player will listen for connecting instances on.
+     */
+    public static final int PORT = 3001;
+
     private static final Logger logger = LoggerFactory
             .getLogger(ConfigManager.class);
 
     private static File dataDir;
     private static File commDir;
     private static File configDir;
+
     /**
      * Obtains the data storage directory for the application, creating it if
      * needed.

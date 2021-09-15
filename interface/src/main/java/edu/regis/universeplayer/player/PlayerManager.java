@@ -75,6 +75,10 @@ public class PlayerManager implements PlaybackListener
      */
     public Player<?> getCompatiblePlayer(Song song)
     {
+        if (song == null)
+        {
+            return null;
+        }
         Player<?> player = this.players.get(song.getClass());
         if (player == null)
         {
