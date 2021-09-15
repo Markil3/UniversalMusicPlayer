@@ -89,6 +89,9 @@ var listeners = [function (message, returnValue) {
         }
         switch (type)
         {
+        case "NumberPing":
+            returnValue = message.number;
+            break;
         case "CommandLoadSong":
             returnValue = () => {
                 if (message.song)
