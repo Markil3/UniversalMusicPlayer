@@ -1,3 +1,5 @@
+import java.util.stream.Collectors
+
 /*
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
  */
@@ -10,3 +12,55 @@
  * user guide available at https://docs.gradle.org/4.4.1/userguide/tutorial_java_projects.html
  */
 ext.defaultPackage = "edu.regis.universeplayer"
+
+configurations {
+    browserData {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+    appData {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
+
+dependencies {
+    browserData project(path: ":browser", configuration: 'install')
+    appData project(path: ":interface", configuration: "install")
+    appData project(path: ":addonInter", configuration: "install")
+}
+
+task mergeApps(type: Tar) {
+    dependsOn configurations.appData
+    for (File file : configurations.appData.files) {
+        from(tarTree(file)) {
+            exclude "*"
+            include "*/bin/**"
+            include "*/lib/**"
+            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+            eachFile { fcd ->
+                fcd.relativePath = new RelativePath(true, fcd.relativePath.segments.drop(1))
+            }
+            includeEmptyDirs = false
+        }
+    }
+    archiveFileName = "${project.name}.tar"
+    destinationDirectory = file("$buildDir")
+    doFirst {
+        println "$buildDir"
+    }
+}
+
+task buildscriptNix(type: Copy) {
+    dependsOn configurations.browserData
+    dependsOn mergeApps
+    from "$project.rootDir/src/install.sh"
+    into "$buildDir"
+    expand(project(":browser").properties)
+    doLast {
+        file("${buildDir}/install.sh").append "__BROWSERCONF__\n".bytes
+        file("${buildDir}/install.sh").append configurations.browserData.resolve().stream().findFirst().map(file -> file.bytes).get()
+        file("${buildDir}/install.sh").append "\n__APPDATA__\n".bytes
+        file("${buildDir}/install.sh").append mergeApps.archiveFile.get().asFile.bytes
+    }
+}

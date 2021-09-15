@@ -20,6 +20,10 @@ configurations {
         canBeConsumed = true
         canBeResolved = false
     }
+    install {
+        canBeConsumed = true
+        canBeResolved = false
+    }
 }
 
 // In this section you declare where to find the dependencies of your project
@@ -57,4 +61,5 @@ artifacts {
     nativeBuild(installDist.destinationDir) {
         builtBy installDist
     }
+    install(distTar)
 }

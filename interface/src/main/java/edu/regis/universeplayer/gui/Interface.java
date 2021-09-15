@@ -619,12 +619,13 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     @Override
     public void windowClosing(WindowEvent windowEvent)
     {
-        PlayerManager.getPlayers().shutdownPlayers();
+        logger.info("Window closing");
     }
 
     @Override
     public void windowClosed(WindowEvent windowEvent)
     {
+        logger.info("Window closed");
     }
 
     @Override

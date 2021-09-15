@@ -16,6 +16,10 @@ configurations {
 		canBeConsumed = false
 		canBeResolved = true
 	}
+	install {
+		canBeConsumed = true
+		canBeResolved = false
+	}
 }
 
 // In this section you declare where to find the dependencies of your project
@@ -44,9 +48,6 @@ repositories {
 		}
     }
 }
-
-def firefox_module = "devedition"
-def firefox_revision = "92.0b7"
 
 abstract class InstallBrowserTask extends DefaultTask {
 	@OutputFile
@@ -248,6 +249,31 @@ task installAddons(type: Copy) {
 	}
 }
 
+task zipPolicies(type: Tar) {
+	archiveFileName = "conf.tar"
+	destinationDirectory = file("$buildDir")
+	from(configurations.addon.files) {
+		into "distribution/extensions"
+	}
+	from files("browserConf")
+	filesMatching('**/policies.json'){
+		def pre = ""
+		for (File addon: configurations.addon.resolve())
+		{
+			if (pre.length() > 0)
+			{
+				pre += ",\n"
+			}
+			pre += "\"" + addon.name.substring(0, addon.name.lastIndexOf('.')) + "\": {\n"
+			pre += "\"installation_mode\": \"forced_install\","
+			pre += "\"install_url\": \"" + addon.toURI().toString() + "\""
+			pre += "}"
+		}
+		println "Expanding ${pre}"
+		expand(preinstalled: pre)
+	}
+}
+
 tasks.named('clean') {
 	dependsOn uninstallFirefoxWindows
 }
@@ -255,3 +281,7 @@ println configurations.getNames()
 
 compileJava.dependsOn installAddons
 compileJava.dependsOn movePolicies
+
+artifacts {
+	install(zipPolicies)
+}

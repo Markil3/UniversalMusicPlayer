@@ -203,7 +203,10 @@ public class PlayerEnvironment
          */
         runArguments(ops, params, System.out);
 
-        Runtime.getRuntime().addShutdownHook(new Thread(connector::stop));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            connector.stop();
+            PlayerManager.getPlayers().shutdownPlayers();
+        }));
     }
 
     /**
