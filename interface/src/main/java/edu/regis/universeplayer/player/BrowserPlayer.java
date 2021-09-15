@@ -33,6 +33,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             .getLogger(BrowserPlayer.class);
 
     private final LinkedList<PlaybackListener> listeners = new LinkedList<>();
+    private boolean error = false;
 
     private InternetSong currentSong;
 
@@ -40,9 +41,9 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
 
     private Browser getBrowser()
     {
-        if (browserRef == null)
+        if (browserRef == null && !this.error)
         {
-            while (Browser.getInstance() == null)
+            if (Browser.getInstance() == null)
             {
                 try
                 {
@@ -53,8 +54,11 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
                     logger.error("Interrupted while waiting for browser to initialize.", e);
                 }
             }
-            Browser.getInstance().addUpdateListener(this);
-            browserRef = Browser.getInstance();
+            if (Browser.getInstance() != null)
+            {
+                Browser.getInstance().addUpdateListener(this);
+                browserRef = Browser.getInstance();
+            }
         }
         return browserRef;
     }
@@ -70,6 +74,8 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             catch (IOException | InterruptedException e)
             {
                 logger.error("Could not initialize browser", e);
+                this.error = true;
+                Browser.notifyAllInstance();
             }
         });
         browserThread.start();

@@ -69,6 +69,7 @@ public class Browser extends MessageRunner
                         logger.error(scanner.nextLine());
                     }
                 }
+                notifyAllInstance();
                 throw new IOException("Error in browser launch (exit code " + startExit + ")");
             }
         }
@@ -155,6 +156,14 @@ public class Browser extends MessageRunner
                 process.destroy();
             }
         }
+    }
+
+    /**
+     *
+     */
+    public void stop()
+    {
+        this.running = false;
     }
 
     /**

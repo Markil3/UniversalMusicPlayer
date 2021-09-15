@@ -46,6 +46,7 @@ public class PlayerEnvironment
      */
     public static void main(String[] args)
     {
+        logger.info("MAIN FOREVER");
         LinkedHashMap<String, Object> ops = new LinkedHashMap<>();
         ArrayList<String> params = new ArrayList<>();
         parseArgs(args, ops, params);
