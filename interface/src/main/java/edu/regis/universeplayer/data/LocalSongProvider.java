@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -28,6 +29,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
 
     private final File source;
 
+    private final AtomicBoolean updating = new AtomicBoolean(false);
     private final HashMap<File, LocalSong> songs = new HashMap<>();
     private final HashMap<String, Album> albums = new HashMap<>();
     /**
@@ -174,6 +176,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
 
     private void getSongCache()
     {
+        updating.set(true);
         service.submit(new SongQuery(true));
     }
 
@@ -185,6 +188,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<Album> getAlbums()
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         return this.albums.values();
     }
 
@@ -196,6 +213,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<LocalSong> getSongs()
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         synchronized (this.songs)
         {
             return Collections.unmodifiableCollection(this.songs.values());
@@ -210,6 +241,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<String> getArtists()
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         return this.artists;
     }
 
@@ -221,6 +266,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<String> getAlbumArtists()
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         return this.albumArtists;
     }
 
@@ -232,6 +291,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<String> getGenres()
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         return this.genres;
     }
 
@@ -243,6 +316,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<Integer> getYears()
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         return this.years;
     }
 
@@ -256,6 +343,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<LocalSong> getSongsFromAlbum(Album album)
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         synchronized (this.songs)
         {
             return this.songs.values().stream()
@@ -274,6 +375,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<LocalSong> getSongsFromArtist(String artist)
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         synchronized (this.songs)
         {
             return this.songs.values().stream()
@@ -293,6 +408,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Album getAlbumByName(String name)
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         synchronized (this.albums)
         {
             return this.albums.get(name);
@@ -308,6 +437,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<Album> getAlbumsFromArtist(String artist)
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         synchronized (this.albums)
         {
             return this.albums.values().stream()
@@ -326,6 +469,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<Album> getAlbumsFromGenre(String genre)
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         synchronized (this.albums)
         {
             return this.albums.values().stream()
@@ -344,6 +501,20 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     @Override
     public Collection<Album> getAlbumsFromYear(int year)
     {
+        synchronized (this.updating)
+        {
+            while (this.updating.get())
+            {
+                try
+                {
+                    this.updating.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    logger.error("Error while waiting for update lock", e);
+                }
+            }
+        }
         synchronized (this.albums)
         {
             return this.albums.values().stream()
@@ -962,141 +1133,149 @@ public class LocalSongProvider implements SongProvider<LocalSong>
             LocalSong song;
             int numAlbums = 0, numSongs = 0;
 
-            try
+            updating.set(true);
+            synchronized (updating)
             {
-                logger.debug("Querying database.");
-                /*
-                 * Check if the table exists
-                 */
-                synchronized (DatabaseManager.getDb())
+                try
                 {
+                    logger.debug("Querying database.");
                     /*
-                     * Make sure that a "null" album is available
+                     * Check if the table exists
                      */
-
-                    if (albums.get(null) == null)
+                    synchronized (DatabaseManager.getDb())
                     {
-                        album = new Album();
-                        album.name = "Unknown";
-                        albums.put(null, album);
-                    }
-
-                    if (albums.get("Unknown") == null)
-                    {
-                        albums.put("Unknown", albums.get(null));
-                    }
-
-                    state = DatabaseManager.getDb().createStatement();
-                    result = state
-                            .executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_ALBUMS';");
-                    if (!result.next())
-                    {
-                        logger.debug("Creating album table.");
                         /*
-                         * Create the table
+                         * Make sure that a "null" album is available
                          */
-                        state.executeUpdate("CREATE TABLE LOCAL_ALBUMS" +
-                                "(ALBUM TEXT PRIMARY KEY NOT NULL," +
-                                "ARTISTS TEXT," +
-                                "YEAR INTEGER," +
-                                "GENRES TEXT," +
-                                "TRACKS INTEGER," +
-                                "DISCS INTEGER);");
-                    }
-                    else
-                    {
-                        result = state
-                                .executeQuery("SELECT * FROM LOCAL_ALBUMS;");
-                        while (result.next())
+
+                        if (albums.get(null) == null)
                         {
-                            album = albums.get(result.getString("album"));
-                            if (album == null)
-                            {
-                                album = new Album();
-                                album.name = result.getString("album");
-                                albums.put(album.name, album);
-                            }
-                            album.artists = Optional
-                                    .ofNullable(result.getString("artists"))
-                                    .map(s -> s.split(";"))
-                                    .orElse(new String[0]);
-                            album.year = result.getInt("year");
-                            album.genres = Optional
-                                    .ofNullable(result.getString("genres"))
-                                    .map(s -> s.split(";"))
-                                    .orElse(new String[0]);
-                            album.totalTracks = result.getInt("tracks");
-                            album.totalDiscs = result.getInt("discs");
-                            numAlbums++;
+                            album = new Album();
+                            album.name = "Unknown";
+                            albums.put(null, album);
                         }
-                    }
-                    result = state
-                            .executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_SONGS';");
-                    if (!result.next())
-                    {
-                        logger.debug("Creating song table.");
-                        /*
-                         * Create the table
-                         */
-                        state.executeUpdate("CREATE TABLE LOCAL_SONGS" +
-                                "(FILE TEXT PRIMARY KEY NOT NULL," +
-                                "CODEC CHAR(5)," +
-                                "TYPE CHAR(5)," +
-                                "TITLE TEXT," +
-                                "ARTISTS TEXT," +
-                                "TRACK INTEGER," +
-                                "DISC INTEGER," +
-                                "DURATION BIGINT," +
-                                "ALBUM TEXT," +
-                                "MOD BIGINT);");
-                    }
-                    else
-                    {
-                        result = state
-                                .executeQuery("SELECT * FROM LOCAL_SONGS;");
-                        while (result.next())
+
+                        if (albums.get("Unknown") == null)
                         {
-                            if (result.getString("file") == null)
-                            {
-                                continue;
-                            }
-                            song = songs
-                                    .get(new File(result.getString("file")));
-                            if (song == null)
-                            {
-                                song = new LocalSong();
-                                song.file = new File(result.getString("file"));
-                                songs.put(song.file, song);
-                            }
-                            song.codec = result.getString("codec");
-                            song.type = result.getString("type");
-                            song.title = result.getString("title");
-                            song.artists = Optional
-                                    .ofNullable(result.getString("artists"))
-                                    .map(s -> s.split(";"))
-                                    .orElse(new String[0]);
-                            song.trackNum = result.getInt("track");
-                            song.disc = result.getInt("disc");
-                            song.duration = result.getLong("duration");
-                            song.album = Optional
-                                    .ofNullable(result.getString("album"))
-                                    .map(albums::get)
-                                    .orElse(albums.get("Unknown"));
-                            numSongs++;
+                            albums.put("Unknown", albums.get(null));
                         }
+
+                        state = DatabaseManager.getDb().createStatement();
+                        result = state
+                                .executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_ALBUMS';");
+                        if (!result.next())
+                        {
+                            logger.debug("Creating album table.");
+                            /*
+                             * Create the table
+                             */
+                            state.executeUpdate("CREATE TABLE LOCAL_ALBUMS" +
+                                    "(ALBUM TEXT PRIMARY KEY NOT NULL," +
+                                    "ARTISTS TEXT," +
+                                    "YEAR INTEGER," +
+                                    "GENRES TEXT," +
+                                    "TRACKS INTEGER," +
+                                    "DISCS INTEGER);");
+                        }
+                        else
+                        {
+                            result = state
+                                    .executeQuery("SELECT * FROM LOCAL_ALBUMS;");
+                            while (result.next())
+                            {
+                                album = albums.get(result.getString("album"));
+                                if (album == null)
+                                {
+                                    album = new Album();
+                                    album.name = result.getString("album");
+                                    albums.put(album.name, album);
+                                }
+                                album.artists = Optional
+                                        .ofNullable(result.getString("artists"))
+                                        .map(s -> s.split(";"))
+                                        .orElse(new String[0]);
+                                album.year = result.getInt("year");
+                                album.genres = Optional
+                                        .ofNullable(result.getString("genres"))
+                                        .map(s -> s.split(";"))
+                                        .orElse(new String[0]);
+                                album.totalTracks = result.getInt("tracks");
+                                album.totalDiscs = result.getInt("discs");
+                                numAlbums++;
+                            }
+                        }
+                        result = state
+                                .executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_SONGS';");
+                        if (!result.next())
+                        {
+                            logger.debug("Creating song table.");
+                            /*
+                             * Create the table
+                             */
+                            state.executeUpdate("CREATE TABLE LOCAL_SONGS" +
+                                    "(FILE TEXT PRIMARY KEY NOT NULL," +
+                                    "CODEC CHAR(5)," +
+                                    "TYPE CHAR(5)," +
+                                    "TITLE TEXT," +
+                                    "ARTISTS TEXT," +
+                                    "TRACK INTEGER," +
+                                    "DISC INTEGER," +
+                                    "DURATION BIGINT," +
+                                    "ALBUM TEXT," +
+                                    "MOD BIGINT);");
+                        }
+                        else
+                        {
+                            result = state
+                                    .executeQuery("SELECT * FROM LOCAL_SONGS;");
+                            while (result.next())
+                            {
+                                if (result.getString("file") == null)
+                                {
+                                    continue;
+                                }
+                                song = songs
+                                        .get(new File(result
+                                                .getString("file")));
+                                if (song == null)
+                                {
+                                    song = new LocalSong();
+                                    song.file = new File(result
+                                            .getString("file"));
+                                    songs.put(song.file, song);
+                                }
+                                song.codec = result.getString("codec");
+                                song.type = result.getString("type");
+                                song.title = result.getString("title");
+                                song.artists = Optional
+                                        .ofNullable(result.getString("artists"))
+                                        .map(s -> s.split(";"))
+                                        .orElse(new String[0]);
+                                song.trackNum = result.getInt("track");
+                                song.disc = result.getInt("disc");
+                                song.duration = result.getLong("duration");
+                                song.album = Optional
+                                        .ofNullable(result.getString("album"))
+                                        .map(albums::get)
+                                        .orElse(albums.get("Unknown"));
+                                numSongs++;
+                            }
+                        }
+                        state.close();
                     }
-                    state.close();
                 }
-            }
-            catch (SQLException e)
-            {
-                logger.error("Could not query SQL database.", e);
-            }
-            logger.debug("Query complete, retrieved {} albums and {} songs", numAlbums, numSongs);
-            updatedSongs = 0;
-            totalUpdate = 0;
-            triggerUpdateListeners();
+                catch (SQLException e)
+                {
+                    logger.error("Could not query SQL database.", e);
+                }
+                logger.debug("Query complete, retrieved {} albums and {} songs", numAlbums, numSongs);
+                updatedSongs = 0;
+                totalUpdate = 0;
 
+                updating.set(false);
+                updating.notifyAll();
+            }
+            triggerUpdateListeners();
             if (scan)
             {
                 LinkedList<SongScanner> scanners = new LinkedList<>();

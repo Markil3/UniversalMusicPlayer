@@ -82,211 +82,250 @@ public class SongList extends ScrollablePanel
      *
      * @param songs - The songs to display.
      */
-    public void listAlbums(Collection<? extends Song> songs)
+    public SwingWorker listAlbums(Collection<? extends Song> songs)
     {
-        logger.debug("Sorting {} songs...", songs.size());
-        Map<Album, List<Song>> albums = songs.stream().sorted().collect(Collectors
-                .groupingBy(song -> song.album, Collectors
-                        .mapping(song -> (Song) song, Collectors.toList())));
-        logger.debug("Listing {} albums ({} songs)",
-                albums.size(), songs.size());
-        GridBagConstraints c = new GridBagConstraints();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        AtomicInteger i = new AtomicInteger(0);
-
-        this.labelMap.clear();
-        this.artMap.clear();
-        this.removeAll();
-        this.currentAlbums = albums;
-
-        albums.keySet().stream().sorted().forEach((album) -> {
-            List<Song> songCollection = albums.get(album);
-
-            AlbumInfo albumInfo = new AlbumInfo(album);
-            c.gridx = 0;
-            c.gridy = i.get();
-            c.gridwidth = 1;
-            c.gridheight = songCollection.size();
-            c.weightx = 0;
-            c.anchor = GridBagConstraints.NORTHWEST;
-            c.insets = new Insets(0, 0, 20, 10);
-            List<Song> finalSongCollection = songCollection;
-            albumInfo.addMouseListener((ClickListener) e -> {
-                if (e.getClickCount() == 2)
-                {
-                    Queue.getInstance().addAll(finalSongCollection);
-                }
-            });
-            albumInfo.albumName.addMouseListener((ClickListener) e -> {
-                if (e.getClickCount() == 2)
-                {
-                    Container inter = this;
-                    do
-                    {
-                        inter = inter.getParent();
-                    }
-                    while (!(inter instanceof Interface) && inter
-                            .getParent() != null);
-                    if (inter instanceof Interface)
-                    {
-                        ((Interface) inter).updateSongs(SongProvider.INSTANCE
-                                .getSongsFromAlbum(albumInfo.album));
-                    }
-                }
-            });
-            albumInfo.artists.addMouseListener((ClickListener) e -> {
-                if (e.getClickCount() == 2)
-                {
-                    Container inter = this;
-                    do
-                    {
-                        inter = inter.getParent();
-                    }
-                    while (!(inter instanceof Interface) && inter
-                            .getParent() != null);
-                    if (inter instanceof Interface)
-                    {
-                        ((Interface) inter)
-                                .updateCollections(CollectionType.album, Arrays
-                                        .stream(albumInfo.album.artists)
-                                        .flatMap(s -> SongProvider.INSTANCE
-                                                .getAlbumsFromArtist(s)
-                                                .stream())
-                                        .collect(Collectors.toList()));
-                    }
-                }
-            });
-            albumInfo.genres.addMouseListener((ClickListener) e -> {
-                if (e.getClickCount() == 2)
-                {
-                    Container inter = this;
-                    do
-                    {
-                        inter = inter.getParent();
-                    }
-                    while (!(inter instanceof Interface) && inter
-                            .getParent() != null);
-                    if (inter instanceof Interface)
-                    {
-                        ((Interface) inter)
-                                .updateCollections(CollectionType.album, Arrays
-                                        .stream(albumInfo.album.genres)
-                                        .flatMap(s -> SongProvider.INSTANCE
-                                                .getAlbumsFromGenre(s).stream())
-                                        .collect(Collectors.toList()));
-                    }
-                }
-            });
-            albumInfo.year.addMouseListener((ClickListener) e -> {
-                if (e.getClickCount() == 2)
-                {
-                    Container inter = this;
-                    do
-                    {
-                        inter = inter.getParent();
-                    }
-                    while (!(inter instanceof Interface) && inter
-                            .getParent() != null);
-                    if (inter instanceof Interface)
-                    {
-                        ((Interface) inter)
-                                .updateCollections(CollectionType.album, SongProvider.INSTANCE
-                                        .getAlbumsFromYear(albumInfo.album.year));
-                    }
-                }
-            });
-            this.add(albumInfo, c);
-            this.artMap.put(albumInfo, album);
-
-            JButton firstSong = null;
-
-            JLabel songNum;
-            JButton songTitle;
-            for (Song song : songCollection)
+        SwingWorker worker = new SwingWorker<>()
+        {
+            /**
+             * Computes a result, or throws an exception if unable
+             * to do so.
+             *
+             * <p>
+             * Note that this method is executed only once.
+             *
+             * <p>
+             * Note: this method is executed in a background
+             * thread.
+             *
+             * @return the computed result
+             * @throws Exception if unable to compute a result
+             */
+            @Override
+            protected Object doInBackground() throws Exception
             {
-                songNum = new JLabel(String.valueOf(song.trackNum));
-                songNum.setFocusable(false);
-                c.gridx = 1;
-                c.gridy = i.get();
-                c.gridheight = 1;
-                c.weightx = 0;
-                c.anchor = GridBagConstraints.NORTHEAST;
-                c.insets = new Insets(0, 0, 0, 0);
-                this.add(songNum, c);
-                this.labelMap.put(songNum, song);
+                logger.debug("Sorting {} songs...", songs.size());
+                Map<Album, List<Song>> albums = songs.stream().sorted().collect(Collectors
+                        .groupingBy(song -> song.album, Collectors
+                                .mapping(song -> (Song) song, Collectors.toList())));
+                logger.debug("Listing {} albums ({} songs)",
+                        albums.size(), songs.size());
+                GridBagConstraints c = new GridBagConstraints();
+                c.fill = GridBagConstraints.HORIZONTAL;
+                AtomicInteger i = new AtomicInteger(0);
 
-                songTitle = new JButton(song.title);
-                if (song.title == null || song.title.isEmpty())
-                {
-                    if (song instanceof LocalSong)
-                    {
-                        songTitle.setText(((LocalSong) song).file.getName());
-                    }
-                }
-                songTitle.setHorizontalAlignment(JButton.LEFT);
-                songTitle.setFocusPainted(true);
-                songTitle.setMargin(new Insets(0, 0, 0, 0));
-                songTitle.setContentAreaFilled(false);
-                songTitle.setBorderPainted(false);
-                songTitle.setOpaque(false);
-                songTitle.addActionListener(new AbstractAction()
-                {
-                    @Override
-                    public void actionPerformed(ActionEvent e)
-                    {
-                        Queue.getInstance().add(song);
-                        Queue.getInstance()
-                             .skipToSong(Queue.getInstance().size() - 1);
-                    }
+                SwingUtilities.invokeLater(() -> {
+                    labelMap.clear();
+                    artMap.clear();
+                    removeAll();
+                    currentAlbums = albums;
                 });
-                c.gridx = 2;
-                c.gridy = i.get();
-                c.weightx = 1.0;
-                c.anchor = GridBagConstraints.NORTHWEST;
-                c.insets = new Insets(0, 10, 0, 0);
-                this.add(songTitle, c);
-                this.labelMap.put(songTitle, song);
-                // TODO - Add song length or something
 
-                if (firstSong == null)
-                {
-                    firstSong = songTitle;
-                    JButton finalFirstSong = firstSong;
-                    albumInfo.setAction(new AbstractAction()
-                    {
-                        @Override
-                        public void actionPerformed(ActionEvent e)
+                LinkedHashMap<JComponent, GridBagConstraints> albumInfos =
+                        new LinkedHashMap<>();
+                albums.keySet().stream().sorted().forEach((album) -> {
+                    List<Song> songCollection = albums.get(album);
+
+                    AlbumInfo albumInfo = new AlbumInfo(album);
+                    c.gridx = 0;
+                    c.gridy = i.get();
+                    c.gridwidth = 1;
+                    c.gridheight = songCollection.size();
+                    c.weightx = 0;
+                    c.anchor = GridBagConstraints.NORTHWEST;
+                    c.insets = new Insets(0, 0, 20, 10);
+                    List<Song> finalSongCollection = songCollection;
+                    albumInfo.addMouseListener((ClickListener) e -> {
+                        if (e.getClickCount() == 2)
                         {
-                            finalFirstSong.requestFocusInWindow();
+                            Queue.getInstance().addAll(finalSongCollection);
                         }
                     });
-                    List<Song> finalSongCollection1 = songCollection;
-                    albumInfo.addKeyListener(new KeyAdapter()
-                    {
-                        @Override
-                        public void keyTyped(KeyEvent e)
+                    albumInfo.albumName.addMouseListener((ClickListener) e -> {
+                        if (e.getClickCount() == 2)
                         {
-                            if (e.getKeyCode() == KeyEvent.VK_ENTER)
+                            Container inter = SongList.this;
+                            do
                             {
-                                Queue.getInstance()
-                                     .addAll(finalSongCollection1);
+                                inter = inter.getParent();
+                            }
+                            while (!(inter instanceof Interface) && inter
+                                    .getParent() != null);
+                            if (inter instanceof Interface)
+                            {
+                                ((Interface) inter).updateSongs(SongProvider.INSTANCE
+                                        .getSongsFromAlbum(albumInfo.album));
                             }
                         }
                     });
-                }
-                i.getAndIncrement();
-            }
+                    albumInfo.artists.addMouseListener((ClickListener) e -> {
+                        if (e.getClickCount() == 2)
+                        {
+                            Container inter = SongList.this;
+                            do
+                            {
+                                inter = inter.getParent();
+                            }
+                            while (!(inter instanceof Interface) && inter
+                                    .getParent() != null);
+                            if (inter instanceof Interface)
+                            {
+                                ((Interface) inter)
+                                        .updateCollections(CollectionType.album, Arrays
+                                                .stream(albumInfo.album.artists)
+                                                .flatMap(s -> SongProvider.INSTANCE
+                                                        .getAlbumsFromArtist(s)
+                                                        .stream())
+                                                .collect(Collectors.toList()));
+                            }
+                        }
+                    });
+                    albumInfo.genres.addMouseListener((ClickListener) e -> {
+                        if (e.getClickCount() == 2)
+                        {
+                            Container inter = SongList.this;
+                            do
+                            {
+                                inter = inter.getParent();
+                            }
+                            while (!(inter instanceof Interface) && inter
+                                    .getParent() != null);
+                            if (inter instanceof Interface)
+                            {
+                                ((Interface) inter)
+                                        .updateCollections(CollectionType.album, Arrays
+                                                .stream(albumInfo.album.genres)
+                                                .flatMap(s -> SongProvider.INSTANCE
+                                                        .getAlbumsFromGenre(s).stream())
+                                                .collect(Collectors.toList()));
+                            }
+                        }
+                    });
+                    albumInfo.year.addMouseListener((ClickListener) e -> {
+                        if (e.getClickCount() == 2)
+                        {
+                            Container inter = SongList.this;
+                            do
+                            {
+                                inter = inter.getParent();
+                            }
+                            while (!(inter instanceof Interface) && inter
+                                    .getParent() != null);
+                            if (inter instanceof Interface)
+                            {
+                                ((Interface) inter)
+                                        .updateCollections(CollectionType.album, SongProvider.INSTANCE
+                                                .getAlbumsFromYear(albumInfo.album.year));
+                            }
+                        }
+                    });
+                    albumInfos.put(albumInfo, (GridBagConstraints) c.clone());
+                    artMap.put(albumInfo, album);
+
+                    JButton firstSong = null;
+
+                    JLabel songNum;
+                    JButton songTitle;
+                    AtomicInteger numSongs = new AtomicInteger();
+                    for (Song song : songCollection)
+                    {
+                        songNum = new JLabel(String.valueOf(song.trackNum));
+                        songNum.setFocusable(false);
+                        c.gridx = 1;
+                        c.gridy = i.get();
+                        c.gridheight = 1;
+                        c.weightx = 0;
+                        c.anchor = GridBagConstraints.NORTHEAST;
+                        c.insets = new Insets(0, 0, 0, 0);
+                        albumInfos.put(songNum, (GridBagConstraints) c.clone());
+                        labelMap.put(songNum, song);
+
+                        songTitle = new JButton(song.title);
+                        if (song.title == null || song.title.isEmpty())
+                        {
+                            if (song instanceof LocalSong)
+                            {
+                                songTitle.setText(((LocalSong) song).file.getName());
+                            }
+                        }
+                        songTitle.setHorizontalAlignment(JButton.LEFT);
+                        songTitle.setFocusPainted(true);
+                        songTitle.setMargin(new Insets(0, 0, 0, 0));
+                        songTitle.setContentAreaFilled(false);
+                        songTitle.setBorderPainted(false);
+                        songTitle.setOpaque(false);
+                        songTitle.addActionListener(new AbstractAction()
+                        {
+                            @Override
+                            public void actionPerformed(ActionEvent e)
+                            {
+                                Queue.getInstance().add(song);
+                                Queue.getInstance()
+                                     .skipToSong(Queue.getInstance().size() - 1);
+                            }
+                        });
+                        c.gridx = 2;
+                        c.gridy = i.get();
+                        c.weightx = 1.0;
+                        c.anchor = GridBagConstraints.NORTHWEST;
+                        c.insets = new Insets(0, 10, 0, 0);
+                        albumInfos.put(songTitle, (GridBagConstraints) c.clone());
+                        labelMap.put(songTitle, song);
+                        // TODO - Add song length or something
+
+                        if (firstSong == null)
+                        {
+                            firstSong = songTitle;
+                            JButton finalFirstSong = firstSong;
+                            albumInfo.setAction(new AbstractAction()
+                            {
+                                @Override
+                                public void actionPerformed(ActionEvent e)
+                                {
+                                    finalFirstSong.requestFocusInWindow();
+                                }
+                            });
+                            List<Song> finalSongCollection1 = songCollection;
+                            albumInfo.addKeyListener(new KeyAdapter()
+                            {
+                                @Override
+                                public void keyTyped(KeyEvent e)
+                                {
+                                    if (e.getKeyCode() == KeyEvent.VK_ENTER)
+                                    {
+                                        Queue.getInstance()
+                                             .addAll(finalSongCollection1);
+                                    }
+                                }
+                            });
+                        }
+                        i.getAndIncrement();
+                        this.setProgress((int) (numSongs.incrementAndGet() / (float) songs.size() * 100F));
+                    }
 //            this.add(new JLabel(new ImageIcon(this.getClass().getResource("/gui/icons/defaultart.png"), "Default")), c);
 
-            c.gridx = 0;
-            c.gridy = i.getAndIncrement();
-            c.gridwidth = 3;
-            c.anchor = GridBagConstraints.NORTH;
-            this.add(new JSeparator(SwingConstants.HORIZONTAL), c);
+                    c.gridx = 0;
+                    c.gridy = i.getAndIncrement();
+                    c.gridwidth = 3;
+                    c.anchor = GridBagConstraints.NORTH;
+                    albumInfos.put(new JSeparator(SwingConstants.HORIZONTAL),
+                            (GridBagConstraints) c.clone());
 
-            i.getAndIncrement();
-        });
-        logger.debug("Song list built");
+                    i.getAndIncrement();
+                });
+                logger.debug("Song list built {} components",
+                        albumInfos.size());
+                SwingUtilities.invokeLater(() -> {
+                    albumInfos.forEach((component, c1) -> {
+                        add(component, c1);
+                    });
+                    revalidate();
+                    logger.debug("Components added");
+                });
+                return null;
+            }
+        };
+        worker.execute();
+        return worker;
     }
 
     private class SongListPolicy extends FocusTraversalPolicy

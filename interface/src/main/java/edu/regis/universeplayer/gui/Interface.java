@@ -102,7 +102,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         this.constructWindow();
         this.setFocusManager();
 
-        this.updateSongs(SongProvider.INSTANCE.getSongs());
+//        this.updateSongs(SongProvider.INSTANCE.getSongs());
     }
 
     protected void initActions()
@@ -575,7 +575,6 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     {
         this.songList.listAlbums(songs);
         this.centerView.setViewportView(this.songList);
-        this.songList.revalidate();
         this.centerView.revalidate();
     }
 
