@@ -10,6 +10,11 @@ https://www.videolan.org/vlc/
 
 This program has been tested on Windows and Linux. While MacOS may be supported, it will not as of yet run out of the box (primarily due to extra work needed to get Firefox properly installed there).
 
+![Interface Preview](https://raw.githubusercontent.com/Markil3/UniversalMusicPlayer/master/UniversalMusicPlayer1.png)
+![Artists View](https://raw.githubusercontent.com/Markil3/UniversalMusicPlayer/master/UniversalMusicPlayer2.png)
+![Viewing Single Artist](https://raw.githubusercontent.com/Markil3/UniversalMusicPlayer/master/UniversalMusicPlayer3.png)
+![Adding a Song](https://raw.githubusercontent.com/Markil3/UniversalMusicPlayer/master/UniversalMusicPlayer4.png)
+
 ## Using
 This program has both a GUI and a CLI. If you launch multiple instances, any commands entered in the secondary instances will be forwarded to the main application.
 
