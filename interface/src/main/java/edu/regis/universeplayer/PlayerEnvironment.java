@@ -3,6 +3,7 @@ package edu.regis.universeplayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.Socket;
@@ -46,7 +47,6 @@ public class PlayerEnvironment
      */
     public static void main(String[] args)
     {
-        logger.info("MAIN FOREVER");
         LinkedHashMap<String, Object> ops = new LinkedHashMap<>();
         ArrayList<String> params = new ArrayList<>();
         parseArgs(args, ops, params);
@@ -466,8 +466,6 @@ public class PlayerEnvironment
                     }
                     if (matches > 0)
                     {
-                        out.printf("%d matches for %s and %s\n", matches,
-                                finalParam, song);
                         matchMap.put(song, matches);
                     }
                 });
@@ -477,15 +475,7 @@ public class PlayerEnvironment
                 List<Song> songs = matchMap.entrySet().stream().sorted(Map.Entry
                         .comparingByValue()).filter(entry -> (entry
                         .getValue() / (float) params.size()) >= 0.65F)
-                                           .map(entry -> {
-                                               out.printf("%s: %d / %d (%f)\n",
-                                                       entry.getKey(),
-                                                       entry.getValue(),
-                                                       params.size(),
-                                                       entry.getValue() / (float) params
-                                                               .size());
-                                               return entry.getKey();
-                                           })
+                                           .map(Map.Entry::getKey)
                                            .collect(Collectors.toList());
                 Collections.reverse(songs);
                 out.println("Playing " + songs.toString());

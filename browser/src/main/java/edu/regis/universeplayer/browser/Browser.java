@@ -18,6 +18,7 @@ import java.net.Socket;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import edu.regis.universeplayer.ConfigManager;
 import edu.regis.universeplayer.browserCommands.BrowserConstants;
 import edu.regis.universeplayer.browserCommands.MessageRunner;
 
@@ -178,17 +179,7 @@ public class Browser extends MessageRunner
         String os = System.getProperty("os.name").toLowerCase();
         String arch = System.getProperty("os.arch").toLowerCase();
         String args;
-        File browserDir = new File(System.getProperty("user.dir"), "firefox");
-        if (!browserDir.isDirectory())
-        {
-            browserDir = new File(new File(System.getProperty("user.dir"))
-                    .getParent(), "firefox");
-        }
-        File profileDir = new File(System.getProperty("user.dir"), "profile");
-        if (!profileDir.exists())
-        {
-            profileDir.mkdir();
-        }
+        File browserDir = ConfigManager.getFirefoxDir();
 
 //        args = " -no-remote -profile \"" + profileDir.getAbsolutePath() + "\"";
         args = " -no-remote -P Universal";

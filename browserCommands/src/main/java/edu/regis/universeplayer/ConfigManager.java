@@ -20,6 +20,65 @@ public class ConfigManager
     private static File dataDir;
     private static File commDir;
     private static File configDir;
+    private static File appDir;
+    private static File firefoxDir;
+
+    /**
+     * Obtains the install directory for the application.
+     *
+     * @return The application storage directory.
+     */
+    public static File getAppDir()
+    {
+        if (appDir == null)
+        {
+            appDir = new File(System.getProperty("java.class" +
+                    ".path").split(File.pathSeparator)[0]);
+            appDir = appDir.getParentFile();
+            firefoxDir = new File(appDir, "firefox");
+            if (!firefoxDir.exists())
+            {
+                firefoxDir = new File(appDir.getParent(), "firefox");
+                if (firefoxDir.exists())
+                {
+                    appDir = appDir.getParentFile();
+                }
+                else
+                {
+                    firefoxDir = new File(System.getProperty("user.dir"),
+                            "firefox");
+                    if (firefoxDir.exists())
+                    {
+                        appDir = new File(System.getProperty("user.dir"));
+                    }
+                    else
+                    {
+                        firefoxDir = new File(firefoxDir.getParentFile().getParent(),
+                                "firefox");
+                        if (firefoxDir.exists())
+                        {
+                            appDir = firefoxDir.getParentFile();
+                        }
+                    }
+                }
+            }
+        }
+        return appDir;
+    }
+
+    /**
+     * Obtains the install directory the firefox installation..
+     *
+     * @return The firefox storage directory.
+     */
+    public static File getFirefoxDir()
+    {
+        if (firefoxDir == null)
+        {
+            getAppDir();
+        }
+        return firefoxDir;
+    }
 
     /**
      * Obtains the data storage directory for the application, creating it if

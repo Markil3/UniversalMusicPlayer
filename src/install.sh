@@ -54,11 +54,11 @@ then
   exit 3
 fi
 chmod +X "\$installDir/firefox/firefox"
-rm "/tmp/firefox.tar.bz2"
-if [ \$? -ne 0 ]
-then
-  echo "WARNING: Could not clean up firefox!" 1>&2
-fi
+#rm "/tmp/firefox.tar.bz2"
+#if [ \$? -ne 0 ]
+#then
+#  echo "WARNING: Could not clean up firefox!" 1>&2
+#fi
 
 cd "\$OLDPWD"
 cd "\$installDir/firefox"
