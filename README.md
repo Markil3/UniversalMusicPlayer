@@ -18,51 +18,7 @@ This program has been tested on Windows and Linux. While MacOS may be supported,
 ## Using
 This program has both a GUI and a CLI. If you launch multiple instances, any commands entered in the secondary instances will be forwarded to the main application.
 
-```
-Command-line arguments
-universalplayer [OPTIONS] [term...]
-----------------------------------------------------------------------------
-Arguments
-        term
-                A search term for songs to enqueue. The search term will be
-                applied to songs based on song and album titles, and artist
-                names. Songs that match more terms will be applied first.
-                Any song that does not meet at least 65% of the provided
-                terms will not be added.
-                
-                Any songs that do match will be added to the queue. To
-                replace the current queue, use the --clear option.
-                
-----------------------------------------------------------------------------
-Options
-        --headless
-                Runs the player without a GUI.
-        --play
-                Starts playback
-        --pause
-                Pauses playback
-        --toggle, -t
-                Toggles playback
-        --seek <time>
-                Seeks the player to the provided time, in seconds
-        --clear, -c
-                Clears the queue before adding songs
-        --next, -n [skipBy]
-                Skips to the next song by skipBy songs. Defaults to 1.
-        --prev, -p [skipBy]
-                Skips to the previous song by skipBy songs. Defaults to 1.
-        --skip [skipTo]
-                Skips to the requested song in the queue. Defaults to the next
-                song.
-        --status
-                Obtains the playback status
-        --song
-                Obtains the current song
-        --queue
-                Gets the queue
-        --help, -h
-                Prints this help message
-```
+You can view command-line options on [the wiki](https://github.com/Markil3/UniversalMusicPlayer/wiki/Command-Line-Interface).
 
 ## How it Works
 This program integrates two background programs for audio. Local files are played through VLC media player, courtesy of the [VLCJ](https://github.com/caprica/vlcj) library. This is done with the [edu.regis.universeplayer.player.LocalPlayer](https://github.com/Markil3/UniversalMusicPlayer/blob/master/interface/src/main/java/edu/regis/universeplayer/player/LocalPlayer.java) class. Playback commands are forwarded to VLC in the background.
