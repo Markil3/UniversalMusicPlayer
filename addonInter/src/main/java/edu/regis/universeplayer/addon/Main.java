@@ -45,10 +45,10 @@ public class Main
                             logger.debug("Interface socket closed, shutting down");
                             return true;
                         }
-                        /**
+                        /*
                          * Make sure that it is active.
                          */
-                        this.sendUpdate("ping");
+//                        this.sendUpdate("ping");
                         return false;
                     }
     

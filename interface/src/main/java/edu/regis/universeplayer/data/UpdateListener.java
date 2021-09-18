@@ -15,10 +15,12 @@ public interface UpdateListener
 {
     /**
      * Called when the update status of the player has changed.
+     * @param provider - The provider that triggered the listener.
      * @param updated - The number of songs updated.
      * @param totalUpdate - The total number of songs to update, or -1 if we are
      *                    still determining that.
      * @param updating - The text to display on update bars.
      */
-    void onUpdate(int updated, int totalUpdate, String updating);
+    <T> void onUpdate(DataProvider<T> provider, int updated, int totalUpdate,
+                  String updating);
 }

@@ -9,49 +9,37 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.Future;
+import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.RecursiveTask;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class LocalSongProvider implements SongProvider<LocalSong>
+import edu.regis.universeplayer.ConfigManager;
+
+public class LocalSongProvider extends DatabaseProvider<LocalSong> implements SongProvider<LocalSong>
 {
     private static final Logger logger = LoggerFactory
             .getLogger(LocalSongProvider.class);
+    private static final ResourceBundle langs = ResourceBundle
+            .getBundle("lang.interface", Locale.getDefault());
     private static final HashSet<String> formats = new HashSet<>();
     private static final HashSet<String> codecs = new HashSet<>();
 
-    private static final ForkJoinPool service = new ForkJoinPool();
-    private static String currentFolder;
+    private final AlbumProvider albums;
 
-    private final File source;
-
-    private final AtomicBoolean updating = new AtomicBoolean(false);
-    private final HashMap<File, LocalSong> songs = new HashMap<>();
-    private final HashMap<String, Album> albums = new HashMap<>();
-    /**
-     * A cache of all song artists.
-     */
-    private final HashSet<String> artists = new HashSet<>();
-    /**
-     * A cache of all album genres.
-     */
-    private final HashSet<String> genres = new HashSet<>();
-    /**
-     * A cache of all album artists.
-     */
-    private final HashSet<String> albumArtists = new HashSet<>();
-    /**
-     * A cache of all album release years.
-     */
-    private final HashSet<Integer> years = new HashSet<>();
-
-    private int updatedSongs;
-    private int totalUpdate;
-    private final LinkedList<UpdateListener> listeners = new LinkedList<>();
+    private final AtomicInteger progress = new AtomicInteger(0);
+    private final AtomicInteger updating = new AtomicInteger(0);
+    private String updateItem;
 
     /**
      * Obtains all formats supported by FFMPEG. Note that this list includes
@@ -62,7 +50,7 @@ public class LocalSongProvider implements SongProvider<LocalSong>
     public static Set<String> getFormats()
     {
         final Pattern FILEPAT = Pattern
-                .compile("^\\s*[D ][E ]\\s*([a-z1-9_]{2,}(,[a-z_]{2,})*)\\s*[A-Za-z1-9 \\(\\)-/'\\.\":]+$");
+                .compile("^\\s*[D ][E ]\\s*([a-z1-9_]{2,}(,[a-z_]{2,})*)\\s*[A-Za-z1-9 ()-/'.\":]+$");
         final Pattern FILEPAT2 = Pattern
                 .compile("[a-z1-9_]{2,}(,[a-z1-9_]{2,})*");
         Matcher matcher;
@@ -163,1172 +151,713 @@ public class LocalSongProvider implements SongProvider<LocalSong>
         return codecs;
     }
 
-    public LocalSongProvider(File source)
+    public LocalSongProvider(AlbumProvider albums)
     {
-        Connection dbL = null;
-        this.source = source;
-        if (this.source == null || !this.source.isDirectory())
-        {
-            throw new IllegalArgumentException("File source must be existing directory");
-        }
-        getSongCache();
-    }
-
-    private void getSongCache()
-    {
-        updating.set(true);
-        service.submit(new SongQuery(true));
-    }
-
-    /**
-     * Obtains all albums within the collection.
-     *
-     * @return A list of albums.
-     */
-    @Override
-    public Collection<Album> getAlbums()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        return this.albums.values();
-    }
-
-    /**
-     * Obtains all songs within the collection.
-     *
-     * @return A list of songs.
-     */
-    @Override
-    public Collection<LocalSong> getSongs()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.songs)
-        {
-            return Collections.unmodifiableCollection(this.songs.values());
-        }
-    }
-
-    /**
-     * Obtains a list of all artists.
-     *
-     * @return All artists.
-     */
-    @Override
-    public Collection<String> getArtists()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        return this.artists;
-    }
-
-    /**
-     * Obtains a list of all album artists.
-     *
-     * @return All album artists.
-     */
-    @Override
-    public Collection<String> getAlbumArtists()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        return this.albumArtists;
-    }
-
-    /**
-     * Obtains a list of all genres.
-     *
-     * @return All genres.
-     */
-    @Override
-    public Collection<String> getGenres()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        return this.genres;
-    }
-
-    /**
-     * Obtains a list of all years that have albums.
-     *
-     * @return All years.
-     */
-    @Override
-    public Collection<Integer> getYears()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        return this.years;
-    }
-
-    /**
-     * Obtains all songs from an album.
-     *
-     * @param album - The album to obtain
-     * @return All songs from the requested album, or null if that album is not
-     * in the database.
-     */
-    @Override
-    public Collection<LocalSong> getSongsFromAlbum(Album album)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.songs)
-        {
-            return this.songs.values().stream()
-                             .filter(song -> song.album.equals(album))
-                             .collect(Collectors.toUnmodifiableSet());
-        }
-    }
-
-    /**
-     * Obtains all songs written by a given artist.
-     *
-     * @param artist - The artist to search for
-     * @return A list of all songs from the specified artist, or null if that
-     * artist is not in the database.
-     */
-    @Override
-    public Collection<LocalSong> getSongsFromArtist(String artist)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.songs)
-        {
-            return this.songs.values().stream()
-                             .filter(song -> Arrays.asList(song.artists)
-                                                   .contains(artist))
-                             .collect(Collectors.toUnmodifiableSet());
-        }
-    }
-
-    /**
-     * Obtains an album by a specific name.
-     *
-     * @param name - The name to search for.
-     * @return - The first album that matches the given name, or null if that
-     * album name is not in the database.
-     */
-    @Override
-    public Album getAlbumByName(String name)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.albums)
-        {
-            return this.albums.get(name);
-        }
-    }
-
-    /**
-     * Obtains all albums that were written by a certain artist.
-     *
-     * @param artist - The artist to search for.
-     * @return - The collection on matching albums.
-     */
-    @Override
-    public Collection<Album> getAlbumsFromArtist(String artist)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.albums)
-        {
-            return this.albums.values().stream()
-                              .filter(album -> Arrays.asList(album.artists)
-                                                     .contains(artist))
-                              .collect(Collectors.toUnmodifiableSet());
-        }
-    }
-
-    /**
-     * Obtains all albums that match a certain genre
-     *
-     * @param genre - The genre to search for.
-     * @return - The collection on matching albums.
-     */
-    @Override
-    public Collection<Album> getAlbumsFromGenre(String genre)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.albums)
-        {
-            return this.albums.values().stream()
-                              .filter(album -> Arrays.asList(album.genres)
-                                                     .contains(genre))
-                              .collect(Collectors.toUnmodifiableSet());
-        }
-    }
-
-    /**
-     * Obtains all albums that were released a certain year.
-     *
-     * @param year - The year to search for.
-     * @return - The collection on matching albums.
-     */
-    @Override
-    public Collection<Album> getAlbumsFromYear(int year)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.albums)
-        {
-            return this.albums.values().stream()
-                              .filter(album -> album.year == year)
-                              .collect(Collectors.toUnmodifiableSet());
-        }
+        this.albums = albums;
     }
 
     @Override
     public int getUpdateProgress()
     {
-        return this.updatedSongs;
+        int sup = super.getUpdateProgress();
+        if (sup == 0)
+        {
+            sup = this.progress.get();
+        }
+        return sup;
     }
 
     @Override
-    public int getTotalUpdateSongs()
+    public int getTotalUpdates()
     {
-        return this.totalUpdate;
+        int sup = super.getTotalUpdates();
+        if (sup == 0)
+        {
+            sup = this.updating.get();
+        }
+        return sup;
     }
 
     @Override
     public String getUpdateText()
     {
-        return currentFolder;
+        String sup = super.getUpdateText();
+        if (sup == null || sup.isEmpty())
+        {
+            if (this.updateItem != null)
+            {
+                sup = new Formatter().format(langs.getString("update" +
+                        ".local"), this.updateItem).toString();
+            }
+        }
+        return sup;
     }
 
     @Override
-    public void addUpdateListener(UpdateListener listener)
+    public AlbumProvider getAlbumProvider()
     {
-        this.listeners.add(listener);
+        return this.albums;
     }
 
+    /**
+     * Obtains the name of
+     *
+     * @return The name of the database table. This is case insensitive.
+     */
     @Override
-    public void removeUpdateListener(UpdateListener listener)
+    protected String getDatabaseTable()
     {
-        this.listeners.remove(listener);
+        return "local_songs";
     }
 
-    protected void triggerUpdateListeners()
+    /**
+     * Obtains the SQL string used to create the database table should it be
+     * necessary.
+     *
+     * @return The SQL command that creates the database table. It should take
+     * the format of "CREATE TABLE name (param1 type, param2 type);"
+     */
+    @Override
+    protected String createDatabaseTable()
     {
-        this.listeners.forEach(listener -> listener
-                .onUpdate(this.getUpdateProgress(), this
-                        .getTotalUpdateSongs(), this.getUpdateText()));
+        /*
+         * Create the table
+         */
+        return "CREATE TABLE local_songs" +
+                "(file TEXT PRIMARY KEY NOT NULL," +
+                "codec CHAR(5)," +
+                "type CHAR(5)," +
+                "title TEXT," +
+                "artists TEXT," +
+                "track INTEGER," +
+                "disc INTEGER," +
+                "duration BIGINT," +
+                "album TEXT," +
+                "mod BIGINT);";
     }
 
-    private class SongScanner extends RecursiveAction
+    /**
+     * Called when an entry is read from the database and is ready to be
+     * parsed.
+     * <p>
+     * Note that this method is called for every row. Do NOT call {@link
+     * ResultSet#next()}!
+     *
+     * @param result The result that is read from.
+     */
+    @Override
+    protected LocalSong readResult(ResultSet result) throws SQLException
     {
-        private final File file;
+        LocalSong song = new LocalSong();
+        song.file = new File(result.getString("file"));
+        song.codec = result.getString("codec");
+        song.type = result.getString("type");
+        song.title = result.getString("title");
+        song.artists =
+                Arrays.stream(result.getString("artists").split(";"))
+                      .dropWhile(String::isEmpty)
+                      .map(String::trim).toArray(String[]::new);
+        song.trackNum = result.getInt("track");
+        song.disc = result.getInt("disc");
+        song.duration = result.getLong("duration");
+        try
+        {
+            getAlbumProvider().joinUpdate();
+            song.album = getAlbumProvider().getAlbumByName(result.getString(
+                    "album"));
+        }
+        catch (InterruptedException e)
+        {
+            logger.error("Couldn't wait for album update for song {}", song, e);
+        }
+        song.lastMod = result.getLong("mod");
+        return song;
+    }
 
-        SongScanner(File folder)
+    /**
+     * Called to obtain the properties of an object to write.
+     *
+     * @param item - The item to serialize.
+     * @return Properties to write.
+     */
+    @Override
+    protected Map<String, Object> serializeItem(LocalSong item)
+    {
+        LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+        map.put("file", item.file.getAbsolutePath());
+        map.put("codec", item.codec);
+        map.put("type", item.type);
+        map.put("title", item.title);
+        map.put("artists", Arrays.stream(item.artists).reduce("",
+                (s1, s2) -> s1.isEmpty() ? s2 : s1 + ";" + s2));
+        map.put("track", item.trackNum);
+        map.put("disc", item.disc);
+        map.put("duration", item.duration);
+        map.put("album",
+                Optional.ofNullable(item.album).map(a -> a.name).orElse(null));
+        map.put("mod", item.lastMod);
+        return map;
+    }
+
+    /**
+     * Converts a piece of data into a string that will display in the update
+     * text.
+     *
+     * @param data - The data to stringify.
+     * @return A string representation of the data being updated.
+     */
+    @Override
+    protected String stringifyResult(LocalSong data)
+    {
+        return Optional.ofNullable(data.album).map(a -> a.name).orElse(null) +
+                "/" + data.title;
+    }
+
+    /**
+     * A callback for when the database scan is complete.
+     * <p>
+     * Note that this method is called from the same thread that the scanner is
+     * from.
+     * </p>
+     *
+     * @return A fork-join task to invoke. This may be null.
+     */
+    @Override
+    protected ForkJoinTask[] onComplete()
+    {
+        LinkedHashMap<Path, Map.Entry<ArrayList<Path>, ArrayList<Path>>> scanRoots =
+                new LinkedHashMap<>();
+        boolean existing;
+        Map.Entry<ArrayList<Path>, ArrayList<Path>> subPaths;
+        logger.debug("Searching for scan roots among {}", (Object) ConfigManager
+                .getMusicDirs());
+        for (Path toScan : ConfigManager.getMusicDirs())
+        {
+            existing = false;
+            /*
+             * Make sure that some scan roots aren't subfolders of other roots.
+             */
+            for (Path existingPath : scanRoots.keySet())
+            {
+                if (toScan.startsWith(existingPath))
+                {
+                    scanRoots.get(existingPath).getKey().add(toScan);
+                    existing = true;
+                    break;
+                }
+            }
+            if (!existing)
+            {
+                /*
+                 * Give each scanner a list of excluded folders that they
+                 * will run across.
+                 */
+                subPaths = new AbstractMap.SimpleEntry<>(new ArrayList<>(),
+                        new ArrayList<>());
+                for (Path toExclude : ConfigManager.getMusicExcludeDirs())
+                {
+                    if (toScan.startsWith(toExclude))
+                    {
+                        subPaths.getValue().add(toExclude);
+                        /*
+                         * While we could ensure that we exclude subfolders
+                         * of other excludes, there shouldn't be any
+                         * performance impact from not doing so, and doing so
+                         * would waste processing cycles.
+                         */
+                    }
+                }
+                scanRoots.put(toScan, subPaths);
+            }
+        }
+        ArrayList<Path> toScan = new ArrayList<>();
+        List<ForkJoinTask<List<Path>>> tasks =
+                scanRoots.entrySet().stream()
+                         .map(entry -> new FolderCounter(entry.getKey(),
+                                 entry.getValue().getKey().toArray(Path[]::new),
+                                 entry.getValue().getValue()
+                                      .toArray(Path[]::new)))
+                         .map(this.service::submit)
+                         .collect(Collectors.toList());
+        this.updating.set(-1);
+        for (ForkJoinTask<List<Path>> task : tasks)
+        {
+            toScan.addAll(task.join());
+        }
+        this.updating.set(toScan.size());
+        logger.debug("Scanning {} files", toScan.size());
+        return toScan.stream().map(SongScanner::new)
+                     .toArray(SongScanner[]::new);
+    }
+
+    private class FolderCounter extends RecursiveTask<List<Path>>
+    {
+        private final Path source;
+        private final Path[] exclude;
+        private final Path[] include;
+
+        public FolderCounter(Path source, Path[] exclude, Path[] include)
+        {
+            this.source = source;
+            this.exclude = exclude;
+            this.include = include;
+        }
+
+        /**
+         * The main computation performed by this task.
+         *
+         * @return the result of the computation
+         */
+        @Override
+        protected List<Path> compute()
+        {
+            List<Path> results = new ArrayList<>();
+            if (Files.isDirectory(this.source))
+            {
+                try
+                {
+                    List<FolderCounter> tasks =
+                            Files.list(this.source).flatMap(f -> {
+                                ArrayList<Path> toInclude = new ArrayList<>();
+                                if (Arrays.binarySearch(this.exclude, f) > -1)
+                                {
+                                    /*
+                                     * Just skip
+                                     */
+                                    for (Path include : this.include)
+                                    {
+                                        if (include.startsWith(f))
+                                        {
+                                            toInclude.add(include);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    toInclude.add(f);
+                                }
+                                return toInclude.stream();
+                            }).filter(f -> {
+                                if (Files.isDirectory(f))
+                                {
+                                    return true;
+                                }
+                                else
+                                {
+                                    results.add(f);
+                                    return false;
+                                }
+                            }).map(f -> {
+                                Path[] exclude =
+                                        Arrays.stream(this.exclude)
+                                              .filter(e -> e.startsWith(f))
+                                              .toArray(Path[]::new);
+                                Path[] include =
+                                        Arrays.stream(this.include)
+                                              .filter(e -> e.startsWith(f))
+                                              .toArray(Path[]::new);
+                                return new FolderCounter(f, exclude, include);
+                            }).collect(Collectors.toList());
+                    results.addAll(invokeAll(tasks).stream().flatMap(s -> {
+                        try
+                        {
+                            return s.get().stream();
+                        }
+                        catch (InterruptedException | ExecutionException e)
+                        {
+                            logger.error("Could not get results for {}", s, e);
+                            return Stream.empty();
+                        }
+                    }).collect(Collectors.toList()));
+                }
+                catch (IOException e)
+                {
+                    logger.error("Could not get subfolders of {}", this.source,
+                            e);
+                }
+            }
+            return results;
+        }
+    }
+
+    private class SongScanner extends ForkJoinTask<LocalSong>
+    {
+        private final Path file;
+        private LocalSong song;
+
+        SongScanner(Path folder)
         {
             this.file = folder;
         }
 
+        /**
+         * Returns the result that would be returned by {@link #join}, even if
+         * this task completed abnormally, or {@code null} if this task is not
+         * known to have been completed.  This method is designed to aid
+         * debugging, as well as to support extensions. Its use in any other
+         * context is discouraged.
+         *
+         * @return the result, or {@code null} if not completed
+         */
         @Override
-        public void compute()
+        public LocalSong getRawResult()
+        {
+            return this.song;
+        }
+
+        /**
+         * Forces the given value to be returned as a result.  This method is
+         * designed to support extensions, and should not in general be called
+         * otherwise.
+         *
+         * @param value the value
+         */
+        @Override
+        protected void setRawResult(LocalSong value)
+        {
+            this.song = value;
+        }
+
+        @Override
+        public boolean exec()
+        {
+            LocalSong existing;
+            boolean update;
+
+            existing =
+                    getCollection().stream()
+                                   .filter(f -> f.file.toPath()
+                                                      .equals(this.file))
+                                   .findFirst().orElse(null);
+            if (existing != null)
+            {
+                /*
+                 * The file has been updated.
+                 */
+                update = existing.file.lastModified() > existing.lastMod;
+            }
+            else
+            {
+                update = true;
+            }
+            if (update)
+            {
+                updateItem =
+                        this.file.subpath(this.file.getNameCount() - 3,
+                                this.file.getNameCount() - 1).toString();
+                triggerUpdateListeners();
+                try
+                {
+                    this.complete(this.readSong(this.file, existing));
+                }
+                catch (IOException | InterruptedException e)
+                {
+                    this.completeExceptionally(e);
+                }
+            }
+            progress.incrementAndGet();
+            triggerUpdateListeners();
+            return this.isCompletedNormally();
+        }
+
+        private LocalSong readSong(Path path, LocalSong write) throws IOException, InterruptedException
         {
             Process process;
             String line, lineData;
             String[] streamData;
-
+            Album album;
             String type;
-            String codec;
-
-            String genre = null;
+            String codec = null;
+            String[] genre = null;
             String title = null;
-            String artist = null;
+            String[] artist = null;
             String albumTitle = null;
-            String albumArtist = null;
+            String[] albumArtist = null;
+            int year = 0;
             long duration = 0;
             Integer[] track = null;
             Integer[] disc = null;
 
-            Statement state = null;
-            ResultSet result;
+            type = path.getFileName().toString()
+                       .substring(path.getFileName().toString()
+                                      .lastIndexOf('.') + 1).toLowerCase();
 
-            try
+            if (!getFormats().contains(type))
             {
-                if (file.getName().lastIndexOf(".") < file.getName()
-                                                          .length() - 1)
+                return null;
+            }
+
+            process = Runtime.getRuntime()
+                             .exec(new String[]{"ffprobe", "-hide_banner",
+                                     path.toAbsolutePath().toString()});
+            process.waitFor();
+
+            try (Scanner scanner = new Scanner(process.getErrorStream()))
+            {
+                while (scanner.hasNextLine())
                 {
-                    type = file.getName()
-                               .substring(file.getName().lastIndexOf('.') + 1)
-                               .toLowerCase();
-                    if (getFormats().contains(type))
+                    line = scanner.nextLine().trim();
+                    try
                     {
-                        try
+                        final String data;
+                        int index = line.indexOf(':');
+                        if (index > 0 && index < line.length() - 2)
                         {
-                            synchronized (DatabaseManager.getDb())
+                            data = line.substring(index + 2);
+                        }
+                        else
+                        {
+                            data = line;
+                        }
+                        switch (line.toLowerCase()
+                                    .substring(0, line
+                                            .indexOf(' ') > 0 ? line
+                                            .indexOf(' ') : line
+                                            .length()))
+                        {
+                        case "genre" -> {
+                            /*
+                             * We only take the first one, as to
+                             * avoid mishaps with labels after the
+                             * metadata.
+                             */
+                            if (genre == null)
                             {
-                                state = DatabaseManager.getDb()
-                                                       .createStatement();
-                                result = state
-                                        .executeQuery("SELECT mod FROM local_songs WHERE file='" + this.file
-                                                .getAbsolutePath()
-                                                .replaceAll("'", "''") + "';");
-                                if (result.next())
-                                {
-                                    if (result.getLong(1) >= this.file
-                                            .lastModified())
-                                    {
-                                        /*
-                                         * No modifications needed
-                                         */
-                                        logger.debug("No update needed for {}", file);
-                                        updatedSongs++;
-                                        triggerUpdateListeners();
-                                        return;
-                                    }
-                                    else
-                                    {
-                                        state.executeUpdate("UPDATE local_songs SET mod = " + this.file
-                                                .lastModified() + " WHERE file='" + this.file
-                                                .getAbsolutePath()
-                                                .replaceAll("'", "''") + "';");
-                                    }
-                                }
+                                genre = Arrays.stream(data.split(";"))
+                                              .map(String::trim)
+                                              .toArray(String[]::new);
                             }
-                            currentFolder = file.getPath();
-                            codec = null;
-                            process = Runtime.getRuntime()
-                                             .exec(new String[]{"ffprobe", "-hide_banner", file.getAbsolutePath()});
-                            process.waitFor();
-                            try (Scanner scanner = new Scanner(process
-                                    .getErrorStream()))
+                        }
+                        case "title" -> {
+                            if (title == null)
                             {
-                                int i = 0;
-                                while (scanner.hasNextLine())
-                                {
-                                    line = scanner.nextLine().trim();
-                                    try
-                                    {
-                                        switch (line.toLowerCase()
-                                                    .substring(0, line
-                                                            .indexOf(' ') > 0 ? line
-                                                            .indexOf(' ') : line
-                                                            .length()))
-                                        {
-                                        case "genre" -> {
-                                            /*
-                                             * We only take the first one, as to
-                                             * avoid mishaps with labels after the
-                                             * metadata.
-                                             */
-                                            if (genre == null)
-                                            {
-                                                genre = line.substring(line
-                                                        .indexOf(':') + 2);
-                                            }
-                                        }
-                                        case "title" -> {
-                                            if (title == null)
-                                            {
-                                                title = line.substring(line
-                                                        .indexOf(':') + 2);
-                                            }
-                                        }
-                                        case "artist" -> {
-                                            if (artist == null)
-                                            {
-                                                artist = line.substring(line
-                                                        .indexOf(':') + 2);
-                                            }
-                                        }
-                                        case "album" -> {
-                                            if (albumTitle == null)
-                                            {
-                                                albumTitle = line.substring(line
-                                                        .indexOf(':') + 2);
-                                            }
-                                        }
-                                        case "album_artist" -> {
-                                            if (albumArtist == null)
-                                            {
-                                                albumArtist = line
-                                                        .substring(line
-                                                                .indexOf(':') + 2);
-                                            }
-                                        }
-                                        case "track" -> {
-                                            lineData = line.substring(line
-                                                    .indexOf(':') + 2);
-                                            if (lineData.indexOf('/') >= 0)
-                                            {
-                                                track = Arrays
-                                                        .stream(lineData
-                                                                .split("/"))
-                                                        .map(Integer::parseInt)
-                                                        .toArray(Integer[]::new);
-                                            }
-                                            else
-                                            {
-                                                if (track != null)
-                                                {
-                                                    track[0] = Integer
-                                                            .parseInt(lineData);
-                                                }
-                                                else
-                                                {
-                                                    track = new Integer[]{Integer.parseInt(lineData), -1};
-                                                }
-                                            }
-                                        }
-                                        case "tracktotal" -> {
-                                            if (track != null)
-                                            {
-                                                track[1] = Integer.parseInt(line
-                                                        .substring(line
-                                                                .indexOf(':') + 2));
-                                            }
-                                            else
-                                            {
-                                                track = new Integer[]{-1, Integer.parseInt(line
-                                                        .substring(line
-                                                                .indexOf(':') + 2))};
-                                            }
-                                        }
-                                        case "disc" -> {
-                                            lineData = line.substring(line
-                                                    .indexOf(':') + 2);
-                                            if (lineData.indexOf('/') >= 0)
-                                            {
-                                                disc = Arrays
-                                                        .stream(lineData
-                                                                .split("/"))
-                                                        .map(Integer::parseInt)
-                                                        .toArray(Integer[]::new);
-                                            }
-                                            else
-                                            {
-                                                if (disc != null)
-                                                {
-                                                    disc[0] = Integer
-                                                            .parseInt(lineData);
-                                                }
-                                                else
-                                                {
-                                                    disc = new Integer[]{Integer.parseInt(lineData), -1};
-                                                }
-                                            }
-                                        }
-                                        case "disctotal" -> {
-                                            if (disc != null)
-                                            {
-                                                disc[1] = Integer.parseInt(line
-                                                        .substring(line
-                                                                .indexOf(':') + 2));
-                                            }
-                                            else
-                                            {
-                                                disc = new Integer[]{-1, Integer.parseInt(line
-                                                        .substring(line
-                                                                .indexOf(':') + 2))};
-                                            }
-                                        }
-                                        case "duration:" -> {
-                                            if (duration == 0)
-                                            {
-                                                lineData = line.substring(line
-                                                        .indexOf(':') + 2, line
-                                                        .indexOf(','));
-                                                if (!lineData.equals(
-                                                        "N/A"))
-                                                {
-                                                    duration = Long
-                                                            .parseLong(lineData
-                                                                    .substring(0, 2)) * 3600 * 1000 + Long
-                                                            .parseLong(lineData
-                                                                    .substring(3, 5)) * 60 * 1000 + Long
-                                                            .parseLong(lineData
-                                                                    .substring(6, 8)) * 1000 + (long) (Float
-                                                            .parseFloat(lineData
-                                                                    .substring(8, lineData
-                                                                            .length() - 1)) * 1000);
-                                                }
-                                            }
-                                        }
-                                        case "stream" -> {
-                                            streamData = line.split(" ");
-                                            if (streamData[2].equals("Audio:"))
-                                            {
-                                                codec = streamData[3];
-                                                if (codec.endsWith(","))
-                                                {
-                                                    codec = codec
-                                                            .substring(0, codec
-                                                                    .length() - 1);
-                                                }
-                                                /*
-                                                 * If this isn't a supported codec,
-                                                 * discard.
-                                                 */
-                                                if (!getCodecs()
-                                                        .contains(codec))
-                                                {
-                                                    logger.trace("Invalid codec {} for song {}", codec, file);
-                                                    codec = null;
-                                                }
-                                                else
-                                                {
-                                                    logger.trace("Found codec {} for song {}", codec, file);
-                                                }
-                                            }
-                                            else
-                                            {
-                                                logger.trace("Found non-audio stream {} for {}", line, file);
-                                            }
-                                        }
-                                        }
-                                    }
-                                    catch (NumberFormatException e)
-                                    {
-                                        throw new RuntimeException(
-                                                "Could not parse line \"" + line + "\"", e);
-                                    }
-                                }
-//                            logger.trace("Finished scanning {}", file);
+                                title = data;
                             }
-                            if (codec != null)
+                        }
+                        case "artist" -> {
+                            if (artist == null)
                             {
-                                /*
-                                 * Update album information.
-                                 */
-                                synchronized (DatabaseManager.getDb())
-                                {
-                                    /*
-                                     * This part in particular is prone to thread-safety issues.
-                                     */
-                                    if (albumTitle != null)
-                                    {
-                                        albumTitle = albumTitle.replaceAll("'",
-                                                "''");
-                                    }
-                                    result = state
-                                            .executeQuery("SELECT album FROM local_albums WHERE album='" + albumTitle + "';");
-                                    if (!result.next())
-                                    {
-                                        state.executeUpdate("INSERT INTO local_albums (album) VALUES ('" + albumTitle + "');");
-                                    }
-                                    result = state
-                                            .executeQuery("SELECT artists FROM local_albums WHERE album='" + albumTitle + "';");
-                                    if (result
-                                            .getString("artists") == null && albumArtist != null)
-                                    {
-                                        state.executeUpdate("UPDATE " +
-                                                "local_albums SET artists='" + Arrays
-                                                .stream(albumArtist.split(";"))
-                                                .map(String::trim).map(s -> s
-                                                        .replaceAll("'", "''"))
-                                                .collect(Collectors
-                                                        .joining(";")) + "' WHERE album='" + albumTitle + "';");
-                                    }
-                                    // TODO - Can we get year metadata?
-                                    result = state
-                                            .executeQuery("SELECT genres FROM local_albums WHERE album='" + albumTitle + "';");
-                                    if (result
-                                            .getString("genres") == null && genre != null)
-                                    {
-                                        state.executeUpdate("UPDATE local_albums SET genres='" + Arrays
-                                                .stream(genre.split(";"))
-                                                .map(String::trim).map(s -> s
-                                                        .replaceAll("'", "''"))
-                                                .collect(Collectors
-                                                        .joining(";")) + "' WHERE album='" + albumTitle + "';");
-                                    }
-                                    result = state
-                                            .executeQuery("SELECT tracks FROM local_albums WHERE album='" + albumTitle + "';");
-                                    if (result
-                                            .getInt("tracks") == 0 && track != null && track[1] > 0)
-                                    {
-                                        state.executeUpdate("UPDATE local_albums SET tracks=" + track[1] + " WHERE album='" + albumTitle + "';");
-                                    }
-                                    result = state
-                                            .executeQuery("SELECT discs FROM local_albums WHERE album='" + albumTitle + "';");
-                                    if (result
-                                            .getInt("discs") == 0 && disc != null && disc[1] > 0)
-                                    {
-                                        state.executeUpdate("UPDATE local_albums SET tracks=" + disc[1] + " WHERE album='" + albumTitle + "';");
-                                    }
-
-                                    /*
-                                     * Create the song
-                                     */
-                                    result = state
-                                            .executeQuery("SELECT title FROM local_songs WHERE file='" + file
-                                                    .getAbsolutePath()
-                                                    .replaceAll("'", "''") + "';");
-                                    if (result.next())
-                                    {
-                                        logger.debug("Updating song cache for {} ({})", title, file);
-                                        StringBuilder sql = new StringBuilder("UPDATE local_songs SET ");
-                                        sql.append("codec='").append(codec)
-                                           .append("', ");
-                                        sql.append("type='").append(codec)
-                                           .append("', ");
-                                        if (title != null && !title.isEmpty())
-                                        {
-                                            sql.append("title='").append(title
-                                                    .replaceAll("'", "''"))
-                                               .append("', ");
-                                        }
-                                        else
-                                        {
-                                            sql.append("title='")
-                                               .append(file.getName()
-                                                           .replaceAll("'", "''"))
-                                               .append("', ");
-                                        }
-                                        if (artist != null && !artist.isEmpty())
-                                        {
-                                            sql.append("artists='")
-                                               .append(Optional.of(artist)
-                                                               .map(s -> s
-                                                                       .split(";"))
-                                                               .stream()
-                                                               .flatMap(Arrays::stream)
-                                                               .map(String::trim).map(s -> s.replaceAll("'", "''"))
-                                                               .collect(Collectors
-                                                                       .joining(";")))
-                                               .append("', ");
-                                        }
-                                        else
-                                        {
-                                            sql.append("artists=NULL, ");
-                                        }
-                                        if (track != null && track[0] > 0)
-                                        {
-                                            sql.append("track=")
-                                               .append(track[0]).append(", ");
-                                        }
-                                        else
-                                        {
-                                            sql.append("track=NULL, ");
-                                        }
-                                        if (disc != null && disc[0] > 0)
-                                        {
-                                            sql.append("disc=").append(disc[0])
-                                               .append(", ");
-                                        }
-                                        else
-                                        {
-                                            sql.append("disc=NULL, ");
-                                        }
-                                        if (duration != 0)
-                                        {
-                                            sql.append("duration=")
-                                               .append(duration).append(", ");
-                                        }
-                                        else
-                                        {
-                                            sql.append("duration=NULL, ");
-                                        }
-                                        if (albumTitle != null && !albumTitle
-                                                .isEmpty())
-                                        {
-                                            sql.append("album='")
-                                               .append(albumTitle)
-                                               .append("', ");
-                                        }
-                                        else
-                                        {
-                                            sql.append("album=NULL, ");
-                                        }
-                                        sql.append("mod=")
-                                           .append(file.lastModified());
-                                        sql.append(" WHERE file='")
-                                           .append(file.getAbsolutePath()
-                                                       .replaceAll("'", "''"))
-                                           .append("';");
-                                        state.executeUpdate(sql.toString());
-                                    }
-                                    else
-                                    {
-                                        logger.debug("Caching song {} ({})", title, file);
-                                        StringBuilder sql = new StringBuilder("INSERT INTO local_songs ");
-                                        StringBuilder columns = new StringBuilder("(");
-                                        StringBuilder values = new StringBuilder("(");
-
-                                        columns.append("file,");
-                                        values.append('\'')
-                                              .append(file.getAbsolutePath()
-                                                          .replaceAll("'", "''"))
-                                              .append("',");
-                                        columns.append("codec,");
-                                        values.append('\'').append(codec)
-                                              .append("',");
-                                        columns.append("type,");
-                                        values.append('\'').append(type)
-                                              .append("',");
-                                        if (title != null && !title.isEmpty())
-                                        {
-                                            columns.append("title,");
-                                            values.append('\'').append(title
-                                                    .replaceAll("'", "''"))
-                                                  .append("',");
-                                        }
-                                        if (artist != null && !artist.isEmpty())
-                                        {
-                                            columns.append("artists,");
-                                            values.append('\'')
-                                                  .append(Optional.of(artist)
-                                                                  .map(s -> s
-                                                                          .split(";"))
-                                                                  .stream()
-                                                                  .flatMap(Arrays::stream)
-                                                                  .map(String::trim)
-                                                                  .map(s -> s
-                                                                          .replaceAll("'", "''"))
-                                                                  .collect(Collectors
-                                                                          .joining(";")))
-                                                  .append("',");
-                                        }
-                                        if (track != null && track[0] > 0)
-                                        {
-                                            columns.append("track,");
-                                            values.append(track[0]).append(",");
-                                        }
-                                        if (disc != null && disc[0] > 0)
-                                        {
-                                            columns.append("disc,");
-                                            values.append(disc[0]).append(",");
-                                        }
-                                        if (duration > 0)
-                                        {
-                                            columns.append("duration,");
-                                            values.append(duration).append(",");
-                                        }
-                                        if (albumTitle != null && !albumTitle
-                                                .isEmpty())
-                                        {
-                                            columns.append("album,");
-                                            values.append('\'')
-                                                  .append(albumTitle)
-                                                  .append("',");
-                                        }
-
-                                        columns.append("mod");
-                                        values.append(file.lastModified());
-
-                                        columns.append(") VALUES ");
-                                        values.append(");");
-                                        sql.append(columns);
-                                        sql.append(values);
-                                        state.executeUpdate(sql.toString());
-                                    }
-                                }
-
-                                updatedSongs++;
-                                triggerUpdateListeners();
+                                artist = Arrays.stream(data.split(";"))
+                                               .map(String::trim)
+                                               .toArray(String[]::new);
+                            }
+                        }
+                        case "album" -> {
+                            if (albumTitle == null)
+                            {
+                                albumTitle = data;
+                            }
+                        }
+                        case "album_artist" -> {
+                            if (albumArtist == null)
+                            {
+                                albumArtist = Arrays.stream(data.split(";"))
+                                                    .map(String::trim)
+                                                    .toArray(String[]::new);
+                            }
+                        }
+                        case "track" -> {
+                            lineData = data;
+                            if (lineData.indexOf('/') >= 0)
+                            {
+                                track = Arrays
+                                        .stream(lineData
+                                                .split("/"))
+                                        .map(Integer::parseInt)
+                                        .toArray(Integer[]::new);
                             }
                             else
                             {
+                                if (track != null)
+                                {
+                                    track[0] = Integer
+                                            .parseInt(lineData);
+                                }
+                                else
+                                {
+                                    track = new Integer[]{Integer.parseInt(lineData), -1};
+                                }
+                            }
+                        }
+                        case "tracktotal" -> {
+                            if (track != null)
+                            {
+                                track[1] = Integer.parseInt(data);
+                            }
+                            else
+                            {
+                                track = new Integer[]{-1, Integer.parseInt(data)};
+                            }
+                        }
+                        case "disc" -> {
+                            lineData = data;
+                            if (lineData.indexOf('/') >= 0)
+                            {
+                                disc = Arrays
+                                        .stream(lineData
+                                                .split("/"))
+                                        .map(Integer::parseInt)
+                                        .toArray(Integer[]::new);
+                            }
+                            else
+                            {
+                                if (disc != null)
+                                {
+                                    disc[0] = Integer
+                                            .parseInt(lineData);
+                                }
+                                else
+                                {
+                                    disc = new Integer[]{Integer.parseInt(lineData), -1};
+                                }
+                            }
+                        }
+                        case "disctotal" -> {
+                            if (disc != null)
+                            {
+                                disc[1] = Integer.parseInt(data);
+                            }
+                            else
+                            {
+                                disc = new Integer[]{-1, Integer.parseInt(data)};
+                            }
+                        }
+                        case "date" -> {
+                            lineData = line.substring(line
+                                            .indexOf(':') + 2,
+                                    Math.min(line.indexOf(':') + 6,
+                                            line.length())).trim();
+                            year = Integer.parseInt(lineData);
+                        }
+                        case "duration:" -> {
+                            if (duration == 0)
+                            {
+                                lineData = line.substring(line
+                                        .indexOf(':') + 2, line
+                                        .indexOf(','));
+                                if (!lineData.equals(
+                                        "N/A"))
+                                {
+                                    duration = Long
+                                            .parseLong(lineData
+                                                    .substring(0, 2)) * 3600 * 1000 + Long
+                                            .parseLong(lineData
+                                                    .substring(3, 5)) * 60 * 1000 + Long
+                                            .parseLong(lineData
+                                                    .substring(6, 8)) * 1000 + (long) (Float
+                                            .parseFloat(lineData
+                                                    .substring(8, lineData
+                                                            .length() - 1)) * 1000);
+                                }
+                            }
+                        }
+                        case "stream" -> {
+                            streamData = line.split(" ");
+                            if (streamData[2].equals("Audio:"))
+                            {
+                                codec = streamData[3];
+                                if (codec.endsWith(","))
+                                {
+                                    codec = codec
+                                            .substring(0, codec
+                                                    .length() - 1);
+                                }
                                 /*
-                                 * Never mind, this isn't an updatable song.
+                                 * If this isn't a supported codec,
+                                 * discard.
                                  */
-                                totalUpdate--;
-                                triggerUpdateListeners();
-                                logger.trace("Could not find codec for {}", file);
+                                if (!getCodecs()
+                                        .contains(codec))
+                                {
+                                    logger.trace("Invalid codec {} for song {}", codec, file);
+                                    codec = null;
+                                }
+                                else
+                                {
+                                    logger.trace("Found codec {} for song {}", codec, file);
+                                }
                             }
-                        }
-                        catch (SQLException e)
-                        {
-                            logger.error("Could not write song " + file + " to database", e);
-                        }
-                        catch (IOException | InterruptedException e)
-                        {
-                            logger.error("Could not get ffprobe information on " + file, e);
-                        }
-                        finally
-                        {
-                            state.close();
-                        }
-                    }
-                    else
-                    {
-                        /*
-                         * Never mind, this isn't an updatable song.
-                         */
-                        totalUpdate--;
-                        triggerUpdateListeners();
-//                    logger.trace("Scanned {}, not applicable", file);
-                    }
-                }
-                else
-                {
-                    /*
-                     * Never mind, this isn't an updatable song.
-                     */
-                    totalUpdate--;
-                    triggerUpdateListeners();
-//                logger.trace("Scanned {}, not applicable", file);
-                }
-            }
-            catch (Throwable e)
-            {
-                logger.error("Error in obtaining song " + this.file, e);
-            }
-        }
-    }
-
-    private class SongQuery extends RecursiveAction
-    {
-        private final boolean scan;
-
-        SongQuery(boolean scan)
-        {
-            this.scan = scan;
-        }
-
-        @Override
-        protected void compute()
-        {
-            Statement state;
-            ResultSet result;
-            Album album;
-            LocalSong song;
-            int numAlbums = 0, numSongs = 0;
-
-            updating.set(true);
-            synchronized (updating)
-            {
-                try
-                {
-                    logger.debug("Querying database.");
-                    /*
-                     * Check if the table exists
-                     */
-                    synchronized (DatabaseManager.getDb())
-                    {
-                        /*
-                         * Make sure that a "null" album is available
-                         */
-
-                        if (albums.get(null) == null)
-                        {
-                            album = new Album();
-                            album.name = "Unknown";
-                            albums.put(null, album);
-                        }
-
-                        if (albums.get("Unknown") == null)
-                        {
-                            albums.put("Unknown", albums.get(null));
-                        }
-
-                        state = DatabaseManager.getDb().createStatement();
-                        result = state
-                                .executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_ALBUMS';");
-                        if (!result.next())
-                        {
-                            logger.debug("Creating album table.");
-                            /*
-                             * Create the table
-                             */
-                            state.executeUpdate("CREATE TABLE LOCAL_ALBUMS" +
-                                    "(ALBUM TEXT PRIMARY KEY NOT NULL," +
-                                    "ARTISTS TEXT," +
-                                    "YEAR INTEGER," +
-                                    "GENRES TEXT," +
-                                    "TRACKS INTEGER," +
-                                    "DISCS INTEGER);");
-                        }
-                        else
-                        {
-                            result = state
-                                    .executeQuery("SELECT * FROM LOCAL_ALBUMS;");
-                            while (result.next())
+                            else
                             {
-                                album = albums.get(result.getString("album"));
-                                if (album == null)
-                                {
-                                    album = new Album();
-                                    album.name = result.getString("album");
-                                    albums.put(album.name, album);
-                                }
-                                album.artists = Optional
-                                        .ofNullable(result.getString("artists"))
-                                        .map(s -> s.split(";"))
-                                        .orElse(new String[0]);
-                                album.year = result.getInt("year");
-                                album.genres = Optional
-                                        .ofNullable(result.getString("genres"))
-                                        .map(s -> s.split(";"))
-                                        .orElse(new String[0]);
-                                album.totalTracks = result.getInt("tracks");
-                                album.totalDiscs = result.getInt("discs");
-                                numAlbums++;
+                                logger.trace("Found non-audio stream {} for {}", line, file);
                             }
                         }
-                        result = state
-                                .executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='LOCAL_SONGS';");
-                        if (!result.next())
-                        {
-                            logger.debug("Creating song table.");
-                            /*
-                             * Create the table
-                             */
-                            state.executeUpdate("CREATE TABLE LOCAL_SONGS" +
-                                    "(FILE TEXT PRIMARY KEY NOT NULL," +
-                                    "CODEC CHAR(5)," +
-                                    "TYPE CHAR(5)," +
-                                    "TITLE TEXT," +
-                                    "ARTISTS TEXT," +
-                                    "TRACK INTEGER," +
-                                    "DISC INTEGER," +
-                                    "DURATION BIGINT," +
-                                    "ALBUM TEXT," +
-                                    "MOD BIGINT);");
                         }
-                        else
-                        {
-                            result = state
-                                    .executeQuery("SELECT * FROM LOCAL_SONGS;");
-                            while (result.next())
-                            {
-                                if (result.getString("file") == null)
-                                {
-                                    continue;
-                                }
-                                song = songs
-                                        .get(new File(result
-                                                .getString("file")));
-                                if (song == null)
-                                {
-                                    song = new LocalSong();
-                                    song.file = new File(result
-                                            .getString("file"));
-                                    songs.put(song.file, song);
-                                }
-                                song.codec = result.getString("codec");
-                                song.type = result.getString("type");
-                                song.title = result.getString("title");
-                                song.artists = Optional
-                                        .ofNullable(result.getString("artists"))
-                                        .map(s -> s.split(";"))
-                                        .orElse(new String[0]);
-                                song.trackNum = result.getInt("track");
-                                song.disc = result.getInt("disc");
-                                song.duration = result.getLong("duration");
-                                song.album = Optional
-                                        .ofNullable(result.getString("album"))
-                                        .map(albums::get)
-                                        .orElse(albums.get("Unknown"));
-                                numSongs++;
-                            }
-                        }
-                        state.close();
+                    }
+                    catch (NumberFormatException e)
+                    {
+                        throw new RuntimeException(
+                                "Could not parse line \"" + line + "\"", e);
                     }
                 }
-                catch (SQLException e)
-                {
-                    logger.error("Could not query SQL database.", e);
-                }
-                logger.debug("Query complete, retrieved {} albums and {} songs", numAlbums, numSongs);
-                updatedSongs = 0;
-                totalUpdate = 0;
+            }
 
-                updating.set(false);
-                updating.notifyAll();
-            }
-            triggerUpdateListeners();
-            if (scan)
+            if (codec == null)
             {
-                LinkedList<SongScanner> scanners = new LinkedList<>();
-                this.invokeFolder(source, scanners);
-                triggerUpdateListeners();
-                logger.debug("Scanning for changes in {} files...", totalUpdate);
-                invokeAll(scanners.toArray(SongScanner[]::new));
-                invokeAll(new ScanCompletion());
+                return null;
             }
-        }
 
-        /**
-         * Searches for all files and scans them
-         *
-         * @param dir      - The file to scan
-         * @param scanners - The list to add the scanners to
-         */
-        private void invokeFolder(File dir, List<SongScanner> scanners)
-        {
-            if (dir.isDirectory())
+            if (write == null)
             {
-                for (File file : Objects
-                        .requireNonNullElse(dir.listFiles(), new File[0]))
-                {
-                    this.invokeFolder(file, scanners);
-                }
+                write = new LocalSong();
+                write.file = path.toFile();
+                write.codec = codec;
+                write.type = type;
             }
-            else
-            {
-                totalUpdate++;
-                scanners.add(new SongScanner(dir));
-            }
-        }
-    }
 
-    private class ScanCompletion extends RecursiveAction
-    {
-        @Override
-        protected void compute()
-        {
-            while (true)
+            write.lastMod = Files.getLastModifiedTime(path).toMillis();
+
+            write.title = title;
+            if (artist != null && artist.length > 0)
             {
-                if (service.awaitQuiescence(60, TimeUnit.SECONDS))
-                {
-                    break;
-                }
+                write.artists = artist;
             }
-            logger.debug("Scan complete. Researching database");
-            currentFolder = "";
-            updatedSongs = 0;
-            totalUpdate = 0;
-            triggerUpdateListeners();
-            invokeAll(new SongQuery(false));
+            if (duration > 0)
+            {
+                write.duration = duration;
+            }
+            if (track != null && track.length > 0)
+            {
+                write.trackNum = track[0];
+            }
+            if (disc != null && disc.length > 0)
+            {
+                write.disc = disc[0];
+            }
+
+            getAlbumProvider().joinUpdate();
+            album = albums.getAlbumByName(albumTitle);
+            if (album == null)
+            {
+                album = new Album();
+                album.name = albumTitle;
+            }
+            if (albumArtist != null && albumArtist.length > 0)
+            {
+                album.artists = albumArtist;
+            }
+            if (genre != null && genre.length > 0)
+            {
+                album.genres = genre;
+            }
+            if (year > 0)
+            {
+                album.year = year;
+            }
+            if (track != null && track.length > 1)
+            {
+                album.totalTracks = track[1];
+            }
+            if (disc != null && disc.length > 1)
+            {
+                album.totalDiscs = disc[1];
+            }
+            write.album = album;
+
+            getAlbumProvider().writeItem(album);
+            writeItem(write);
+
+            return write;
         }
     }
 }

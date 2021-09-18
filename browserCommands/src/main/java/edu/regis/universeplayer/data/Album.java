@@ -24,11 +24,25 @@ public class Album implements Comparable<Album>
     {
         if (o != null && o.name != null)
         {
-            return this.name.compareToIgnoreCase(o.name);
+            if (this.name == null)
+            {
+                return 1;
+            }
+            else
+            {
+                return this.name.compareToIgnoreCase(o.name);
+            }
         }
         else
         {
-            return -1;
+            if (this.name == null)
+            {
+                return 0;
+            }
+            else
+            {
+                return -1;
+            }
         }
     }
 

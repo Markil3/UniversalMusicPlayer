@@ -23,6 +23,11 @@ import java.util.stream.Collectors;
 import javax.swing.JOptionPane;
 
 import edu.regis.universeplayer.browserCommands.QueryFuture;
+import edu.regis.universeplayer.data.AlbumProvider;
+import edu.regis.universeplayer.data.CompiledSongProvider;
+import edu.regis.universeplayer.data.DefaultAlbumProvider;
+import edu.regis.universeplayer.data.InternetSongProvider;
+import edu.regis.universeplayer.data.LocalSongProvider;
 import edu.regis.universeplayer.data.Queue;
 import edu.regis.universeplayer.data.Song;
 import edu.regis.universeplayer.data.SongProvider;
@@ -41,6 +46,19 @@ public class PlayerEnvironment
             .getLogger(PlayerEnvironment.class);
     private static final ResourceBundle langs = ResourceBundle
             .getBundle("lang.interface", Locale.getDefault());
+
+    private static AlbumProvider ALBUMS_INSTANCE;
+    private static SongProvider<?> SONGS_INSTANCE;
+
+    public static AlbumProvider getAlbums()
+    {
+        return ALBUMS_INSTANCE;
+    }
+
+    public static SongProvider<?> getSongs()
+    {
+        return SONGS_INSTANCE;
+    }
 
     /**
      * Initializes the various components, setting up listeners as needed.
@@ -124,6 +142,11 @@ public class PlayerEnvironment
         InstanceConnector connector = new InstanceConnector();
         new Thread(connector).start();
 
+        ALBUMS_INSTANCE = new DefaultAlbumProvider();
+        SONGS_INSTANCE =
+                new CompiledSongProvider(new LocalSongProvider(ALBUMS_INSTANCE),
+                        new InternetSongProvider(ALBUMS_INSTANCE));
+
         Queue queue = Queue.getInstance();
         PlayerManager playback = PlayerManager.getPlayers();
         queue.addSongChangeListener(queue1 -> {
@@ -185,9 +208,10 @@ public class PlayerEnvironment
             }
         });
         playback.addPlaybackListener(status -> {
-            switch (status.getInfo().getStatus())
+            logger.info("Receiving {} from {}", status.getInfo(), status.getSource());
+            if (status.getInfo().getStatus() == PlaybackStatus.FINISHED)
             {
-            case FINISHED -> Queue.getInstance().skipNext();
+                Queue.getInstance().skipNext();
             }
         });
 
@@ -195,7 +219,7 @@ public class PlayerEnvironment
         {
             Interface inter = new Interface();
             inter.setSize(700, 500);
-            SongProvider.INSTANCE.addUpdateListener(inter);
+            SONGS_INSTANCE.addUpdateListener(inter);
             inter.setVisible(true);
         }
 
@@ -222,7 +246,7 @@ public class PlayerEnvironment
                                  Map<String, Object> options,
                                  List<String> params)
     {
-        int equals = -1;
+        int equals;
         Object value;
         String key;
         String valStr;
@@ -424,7 +448,7 @@ public class PlayerEnvironment
             for (String param : params)
             {
                 String finalParam = param.toLowerCase();
-                SongProvider.INSTANCE.getSongs().forEach(song -> {
+                getSongs().getSongs().forEach(song -> {
                     Integer matches = matchMap.get(song);
                     if (matches == null)
                     {

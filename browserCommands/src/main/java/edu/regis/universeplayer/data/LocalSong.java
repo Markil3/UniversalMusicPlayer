@@ -12,9 +12,23 @@ import java.util.Arrays;
  */
 public class LocalSong extends Song
 {
+    /**
+     * The file the song is stored at.
+     */
     public File file;
+    /**
+     * The format type the song is stored in.
+     */
     public String type;
+    /**
+     * The encoding format the song is recorded in.
+     */
     public String codec;
+    /**
+     * The last modification time of this song file, as returned by {@link
+     * File#lastModified()}.
+     */
+    public long lastMod;
 
     @Override
     public int compareTo(Song o)

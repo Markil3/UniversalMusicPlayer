@@ -15,7 +15,9 @@ import javax.swing.*;
 
 import com.wordpress.tips4java.ScrollablePanel;
 
+import edu.regis.universeplayer.PlayerEnvironment;
 import edu.regis.universeplayer.data.Album;
+import edu.regis.universeplayer.data.AlbumProvider;
 import edu.regis.universeplayer.data.CollectionType;
 import edu.regis.universeplayer.data.Song;
 import edu.regis.universeplayer.data.SongProvider;
@@ -144,15 +146,15 @@ public class CollectionList extends ScrollablePanel
             artistLabel.addActionListener(mouseEvent -> {
                 if (album)
                 {
-                    this.triggerSongDisplayListeners(SongProvider.INSTANCE
+                    this.triggerSongDisplayListeners(PlayerEnvironment.getAlbums()
                             .getAlbumsFromArtist(artist).stream()
-                            .flatMap(album2 -> SongProvider.INSTANCE.getSongsFromAlbum(album2)
+                            .flatMap(album2 -> PlayerEnvironment.getSongs().getSongsFromAlbum(album2)
                                     .stream())
                             .collect(Collectors.toList()));
                 }
                 else
                 {
-                    this.triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE
+                    this.triggerSongDisplayListeners(new ArrayList<>(PlayerEnvironment.getSongs()
                             .getSongsFromArtist(artist)));
                 }
             });
@@ -184,7 +186,7 @@ public class CollectionList extends ScrollablePanel
             albumLabel.setText(album.name);
             albumLabel.setHorizontalTextPosition(JLabel.CENTER);
             albumLabel.setVerticalTextPosition(JLabel.BOTTOM);
-            albumLabel.addActionListener(mouseEvent -> this.triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE
+            albumLabel.addActionListener(mouseEvent -> this.triggerSongDisplayListeners(new ArrayList<>(PlayerEnvironment.getSongs()
                     .getSongsFromAlbum(album))));
             this.add(albumLabel);
             this.labelMap.put(albumLabel, album);
@@ -222,9 +224,9 @@ public class CollectionList extends ScrollablePanel
             genreLabel.setText(genre);
             genreLabel.setHorizontalTextPosition(JLabel.CENTER);
             genreLabel.setVerticalTextPosition(JLabel.BOTTOM);
-            genreLabel.addActionListener(mouseEvent -> this.triggerSongDisplayListeners(SongProvider.INSTANCE
+            genreLabel.addActionListener(mouseEvent -> this.triggerSongDisplayListeners(PlayerEnvironment.getAlbums()
                     .getAlbumsFromGenre(genre).stream()
-                    .flatMap(album2 -> SongProvider.INSTANCE.getSongsFromAlbum(album2)
+                    .flatMap(album2 -> PlayerEnvironment.getSongs().getSongsFromAlbum(album2)
                             .stream())
                     .collect(Collectors.toList())));
             this.add(genreLabel);
@@ -263,9 +265,9 @@ public class CollectionList extends ScrollablePanel
             yearLabel.setText(year.toString());
             yearLabel.setHorizontalTextPosition(JLabel.CENTER);
             yearLabel.setVerticalTextPosition(JLabel.BOTTOM);
-            yearLabel.addActionListener(mouseEvent -> this.triggerSongDisplayListeners(SongProvider.INSTANCE
+            yearLabel.addActionListener(mouseEvent -> this.triggerSongDisplayListeners(PlayerEnvironment.getAlbums()
                     .getAlbumsFromYear(year).stream()
-                    .flatMap(album2 -> SongProvider.INSTANCE.getSongsFromAlbum(album2)
+                    .flatMap(album2 -> PlayerEnvironment.getSongs().getSongsFromAlbum(album2)
                             .stream())
                     .collect(Collectors.toList())));
             this.add(yearLabel);

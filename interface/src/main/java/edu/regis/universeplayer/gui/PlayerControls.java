@@ -271,11 +271,11 @@ public class PlayerControls extends JPanel implements PlaybackListener
                 CommandConfirmation confirmation = status.getConfirmation();
                 if (status.getConfirmation().wasSuccessful())
                 {
-                    switch (status.get())
+                    if (status.get() == PlaybackStatus.PLAYING)
                     {
-                    case PLAYING -> confirmation =
-                            PlayerManager.getPlayers().pause()
-                                         .getConfirmation();
+                        confirmation =
+                                PlayerManager.getPlayers().pause()
+                                             .getConfirmation();
                     }
                 }
                 if (confirmation != null && !confirmation.wasSuccessful())
@@ -379,7 +379,7 @@ public class PlayerControls extends JPanel implements PlaybackListener
     void setUpdateProgress(int updated, int toUpdate, String updating)
     {
         this.updateProgress.setString(updating);
-        if (toUpdate == 0)
+        if (toUpdate == 0 || updated == toUpdate)
         {
             this.updateProgress.setVisible(false);
 //            this.updateProgress.setPreferredSize(new Dimension(this.updateProgress.getPreferredSize().width, 0));
@@ -399,6 +399,7 @@ public class PlayerControls extends JPanel implements PlaybackListener
                 this.updateProgress.setValue(updated);
             }
         }
+        this.repaint();
     }
 
     /**

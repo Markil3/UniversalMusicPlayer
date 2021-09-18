@@ -145,7 +145,7 @@ public class InternetSongDialog extends JDialog
         }
     
         SwingUtilities.invokeLater(() -> {
-            Future<InternetSong> future = InternetSongProvider.getInstance().addSong(url, this.titleBox.getText(), this.albumBox.getText(), this.artistBox.getText(), this.genreBox.getText());
+            Future<InternetSong> future = InternetSongProvider.getInstance().addSong(url);
             InternetSong song = null;
             try
             {

@@ -15,6 +15,10 @@ public class InternetSong extends Song
 {
     private static final Logger logger = LoggerFactory
             .getLogger(InternetSong.class);
+
+    /**
+     * The location of the song.
+     */
     public URL location;
 
     @Override
@@ -23,7 +27,7 @@ public class InternetSong extends Song
         int compare = super.compareTo(o);
         if (compare == 0)
         {
-            if (o instanceof LocalSong)
+            if (o instanceof InternetSong)
             {
                 try
                 {

@@ -12,10 +12,29 @@ import java.util.Arrays;
  */
 public class Song implements Comparable<Song>, Serializable
 {
+    /**
+     * The internal ID representing this song in the database.
+     */
+    public int id;
+    /**
+     * The name of the song.
+     */
     public String title;
+    /**
+     * Artists who contributed to the song.
+     */
     public String[] artists;
+    /**
+     * Which track number in the album the song belongs to.
+     */
     public int trackNum;
+    /**
+     * Which disc
+     */
     public int disc;
+    /**
+     * How long the song is in milliseconds.
+     */
     public long duration;
 
     /**

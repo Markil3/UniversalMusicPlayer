@@ -60,4 +60,14 @@ public class PlaybackInfo implements Serializable
     {
         return this.status;
     }
+
+    @Override
+    public String toString()
+    {
+        return "PlaybackInfo{" +
+                "playTime=" + playTime +
+                ", status=" + status +
+                ", currentSong=" + currentSong +
+                '}';
+    }
 }

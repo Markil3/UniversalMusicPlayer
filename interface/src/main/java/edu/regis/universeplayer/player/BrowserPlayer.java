@@ -110,9 +110,8 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
     {
         try
         {
-            QueryFuture<Void> future = new ForwardedFuture(getBrowser()
+            return (QueryFuture<Void>) new ForwardedFuture(getBrowser()
                     .sendObject(new CommandQuit()));
-            return future;
         }
         catch (IOException e)
         {
@@ -190,10 +189,21 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
     {
         try
         {
-            return new ForwardedFuture(getBrowser()
-                    .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE)));
+            QueryFuture<PlaybackStatus> future = this.getStatus();
+            switch (future.get())
+            {
+            case PLAYING -> {
+                return new ForwardedFuture(getBrowser()
+                        .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE)));
+            }
+            case PAUSED, STOPPED, FINISHED -> {
+                return new ForwardedFuture(getBrowser()
+                        .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PLAY)));
+            }
+            }
+            return null;
         }
-        catch (IOException e)
+        catch (IOException | InterruptedException | ExecutionException e)
         {
             logger.error("Could not send message", e);
             return null;
@@ -326,7 +336,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
      *
      * @param forward - Whether the error should be thrown from the foreground
      *                script or the background script.
-     * @return
+     * @return The return value containing error details.
      */
     public QueryFuture<Void> throwError(boolean forward)
     {
@@ -349,6 +359,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
         if (object instanceof PlaybackInfo)
         {
             status = new PlaybackEvent(this, (PlaybackInfo) object);
+            logger.info("Internet playback {}", status.getInfo());
             this.listeners.forEach(l -> l.onPlaybackChanged(status));
         }
     }

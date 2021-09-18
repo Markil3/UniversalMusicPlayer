@@ -7,657 +7,296 @@ package edu.regis.universeplayer.data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-public class InternetSongProvider implements SongProvider<InternetSong>
+import edu.regis.universeplayer.browser.Browser;
+import edu.regis.universeplayer.browserCommands.QuerySongData;
+
+public class InternetSongProvider extends DatabaseProvider<InternetSong> implements SongProvider<InternetSong>
 {
     private static final Logger logger = LoggerFactory.getLogger(InternetSongProvider.class);
-    private static final ExecutorService service = Executors.newSingleThreadExecutor();
+
     private static InternetSongProvider INSTANCE;
-    
+
+    private final AtomicInteger progress = new AtomicInteger(0);
+    private final AtomicInteger updating = new AtomicInteger(0);
+    private String updateItem;
+
+    private final AlbumProvider albums;
+
     public static InternetSongProvider getInstance()
     {
-        if (INSTANCE == null)
-        {
-            INSTANCE = new InternetSongProvider();
-        }
         return INSTANCE;
     }
 
-    private AtomicBoolean updating = new AtomicBoolean();
-    
-    private final HashMap<URL, InternetSong> songs = new HashMap<>();
-    private final HashMap<String, Album> albums = new HashMap<>();
-    /**
-     * A cache of all song artists.
-     */
-    private final HashSet<String> artists = new HashSet<>();
-    /**
-     * A cache of all album genres.
-     */
-    private final HashSet<String> genres = new HashSet<>();
-    /**
-     * A cache of all album artists.
-     */
-    private final HashSet<String> albumArtists = new HashSet<>();
-    /**
-     * A cache of all album release years.
-     */
-    private final HashSet<Integer> years = new HashSet<>();
-    
-    private int updatedSongs;
-    private int totalUpdate;
     private final LinkedList<UpdateListener> listeners = new LinkedList<>();
     
-    private InternetSongProvider()
+    public InternetSongProvider(AlbumProvider albums)
     {
-        this.getSongCache();
+        this.albums = albums;
+        INSTANCE = this;
     }
-    
-    private void getSongCache()
-    {
-        this.updating.set(true);
-        service.submit(new SongQuery());
-    }
-    
-    /**
-     * Obtains all albums within the collection.
-     *
-     * @return A list of albums.
-     */
-    @Override
-    public Collection<Album> getAlbums()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        return this.albums.values();
-    }
-    
-    /**
-     * Obtains all songs within the collection.
-     *
-     * @return A list of songs.
-     */
-    @Override
-    public Collection<InternetSong> getSongs()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.songs)
-        {
-            return Collections.unmodifiableCollection(this.songs.values());
-        }
-    }
-    
-    /**
-     * Obtains a list of all artists.
-     *
-     * @return All artists.
-     */
-    @Override
-    public Collection<String> getArtists()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        return this.artists;
-    }
-    
-    /**
-     * Obtains a list of all album artists.
-     *
-     * @return All album artists.
-     */
-    @Override
-    public Collection<String> getAlbumArtists()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        return this.albumArtists;
-    }
-    
-    /**
-     * Obtains a list of all genres.
-     *
-     * @return All genres.
-     */
-    @Override
-    public Collection<String> getGenres()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        return this.genres;
-    }
-    
-    /**
-     * Obtains a list of all years that have albums.
-     *
-     * @return All years.
-     */
-    @Override
-    public Collection<Integer> getYears()
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        return this.years;
-    }
-    
-    /**
-     * Obtains all songs from an album.
-     *
-     * @param album - The album to obtain
-     * @return All songs from the requested album, or null if that album is not in the database.
-     */
-    @Override
-    public Collection<InternetSong> getSongsFromAlbum(Album album)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.songs)
-        {
-            return this.songs.values().stream().filter(song -> song.album.equals(album)).collect(Collectors.toUnmodifiableSet());
-        }
-    }
-    
-    /**
-     * Obtains all songs written by a given artist.
-     *
-     * @param artist - The artist to search for
-     * @return A list of all songs from the specified artist, or null if that artist is not in the
-     * database.
-     */
-    @Override
-    public Collection<InternetSong> getSongsFromArtist(String artist)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.songs)
-        {
-            return this.songs.values().stream().filter(song -> Arrays.asList(song.artists).contains(artist)).collect(Collectors.toUnmodifiableSet());
-        }
-    }
-    
-    /**
-     * Obtains an album by a specific name.
-     *
-     * @param name - The name to search for.
-     * @return - The first album that matches the given name, or null if that album name is not in
-     * the database.
-     */
-    @Override
-    public Album getAlbumByName(String name)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.albums)
-        {
-            return this.albums.get(name);
-        }
-    }
-    
-    /**
-     * Obtains all albums that were written by a certain artist.
-     *
-     * @param artist - The artist to search for.
-     * @return - The collection on matching albums.
-     */
-    @Override
-    public Collection<Album> getAlbumsFromArtist(String artist)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.albums)
-        {
-            return this.albums.values().stream().filter(album -> Arrays.asList(album.artists).contains(artist)).collect(Collectors.toUnmodifiableSet());
-        }
-    }
-    
-    /**
-     * Obtains all albums that match a certain genre
-     *
-     * @param genre - The genre to search for.
-     * @return - The collection on matching albums.
-     */
-    @Override
-    public Collection<Album> getAlbumsFromGenre(String genre)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.albums)
-        {
-            return this.albums.values().stream().filter(album -> Arrays.asList(album.genres).contains(genre)).collect(Collectors.toUnmodifiableSet());
-        }
-    }
-    
-    /**
-     * Obtains all albums that were released a certain year.
-     *
-     * @param year - The year to search for.
-     * @return - The collection on matching albums.
-     */
-    @Override
-    public Collection<Album> getAlbumsFromYear(int year)
-    {
-        synchronized (this.updating)
-        {
-            while (this.updating.get())
-            {
-                try
-                {
-                    this.updating.wait();
-                }
-                catch (InterruptedException e)
-                {
-                    logger.error("Error while waiting for update lock", e);
-                }
-            }
-        }
-        synchronized (this.albums)
-        {
-            return this.albums.values().stream().filter(album -> album.year == year).collect(Collectors.toUnmodifiableSet());
-        }
-    }
-    
+
     @Override
     public int getUpdateProgress()
     {
-        return this.updatedSongs;
+        int sup = super.getUpdateProgress();
+        if (sup == 0)
+        {
+            sup = this.progress.get();
+        }
+        return sup;
     }
-    
+
     @Override
-    public int getTotalUpdateSongs()
+    public int getTotalUpdates()
     {
-        return this.totalUpdate;
+        int sup = super.getTotalUpdates();
+        if (sup == 0)
+        {
+            sup = this.updating.get();
+        }
+        return sup;
     }
-    
+
     @Override
     public String getUpdateText()
     {
-        return "";
-    }
-    
-    @Override
-    public void addUpdateListener(UpdateListener listener)
-    {
-        this.listeners.add(listener);
-    }
-    
-    @Override
-    public void removeUpdateListener(UpdateListener listener)
-    {
-        this.listeners.remove(listener);
-    }
-    
-    protected void triggerUpdateListeners()
-    {
-        this.listeners.forEach(listener -> listener.onUpdate(this.getUpdateProgress(), this.getTotalUpdateSongs(), this.getUpdateText()));
-    }
-    
-    public Future<InternetSong> addSong(URL url, String title, String albumName, String artists, String genres)
-    {
-        return service.submit(() -> {
-            Album album = albums.get(albumName);
-            Statement state = DatabaseManager.getDb().createStatement();
-            if (album == null)
-            {
-                album = new Album();
-                album.name = albumName;
-                albums.put(albumName, album);
-                synchronized (DatabaseManager.getDb())
-                {
-                    state.executeUpdate("INSERT INTO internet_albums (album) VALUES ('" + albumName + "');");
-                }
-            }
-            album.artists = Arrays.stream(artists.split(";")).map(String::trim).toArray(String[]::new);
-            album.genres = Arrays.stream(genres.split(";")).map(String::trim).toArray(String[]::new);
-            synchronized (DatabaseManager.getDb())
-            {
-                state.executeUpdate("UPDATE internet_albums SET artists='" + String.join(";", album.artists) + "' WHERE album='" + albumName + "';");
-                state.executeUpdate("UPDATE internet_albums SET genres='" + String.join(";", album.genres) + "' WHERE album='" + albumName + "';");
-            }
-            InternetSong song = new InternetSong();
-            song.location = url;
-            song.title = title;
-            song.album = album;
-            song.artists = album.artists.clone();
-            
-            // TODO - Evaluate the song
-            
-            songs.put(url, song);
-            
-            StringBuilder sql = new StringBuilder("INSERT INTO internet_songs ");
-            StringBuilder columns = new StringBuilder("(");
-            StringBuilder values = new StringBuilder("(");
-            
-            columns.append("url,");
-            values.append('\'').append(url.toString().replaceAll("'", "''")).append("',");
-            if (title != null && !title.isEmpty())
-            {
-                columns.append("title,");
-                values.append('\'').append(title.replaceAll("'", "''")).append("',");
-            }
-            if (song.artists != null)
-            {
-                columns.append("artists,");
-                values.append('\'').append(String.join(";", song.artists)).append("',");
-            }
-            columns.append("album");
-            values.append('\'').append(albumName).append("'");
-            
-            columns.append(") VALUES ");
-            values.append(");");
-            sql.append(columns);
-            sql.append(values);
-            synchronized (DatabaseManager.getDb())
-            {
-                state.executeUpdate(sql.toString());
-            }
-            this.triggerUpdateListeners();
-            return song;
-        });
-    }
-    
-    private class SongQuery implements Runnable
-    {
-        SongQuery()
+        String sup = super.getUpdateText();
+        if (sup == null || sup.isEmpty())
         {
+            sup = this.updateItem;
         }
-        
-        @Override
-        public void run()
-        {
-            Statement state;
-            ResultSet result;
-            Album album;
-            InternetSong song;
-            int numAlbums = 0, numSongs = 0;
+        return sup;
+    }
 
-            synchronized (updating)
+    /**
+     * Obtains the name of
+     *
+     * @return The name of the database table. This is case insensitive.
+     */
+    @Override
+    protected String getDatabaseTable()
+    {
+        return "internet_songs";
+    }
+
+    /**
+     * Obtains the SQL string used to create the database table should it be
+     * necessary.
+     *
+     * @return The SQL command that creates the database table. It should take
+     * the format of "CREATE TABLE name (param1 type, param2 type);"
+     */
+    @Override
+    protected String createDatabaseTable()
+    {
+        /*
+         * Create the table
+         */
+        return "CREATE TABLE internet_songs" +
+                "(url TEXT PRIMARY KEY NOT NULL," +
+                "title TEXT," +
+                "artists TEXT," +
+                "track INTEGER," +
+                "disc INTEGER," +
+                "duration BIGINT," +
+                "album TEXT);";
+    }
+
+    @Override
+    public AlbumProvider getAlbumProvider()
+    {
+        return this.albums;
+    }
+
+    /**
+     * Called when an entry is read from the database and is ready to be
+     * parsed.
+     * <p>
+     * Note that this method is called for every row. Do NOT call {@link
+     * ResultSet#next()}!
+     *
+     * @param result The result that is read from.
+     */
+    @Override
+    protected InternetSong readResult(ResultSet result) throws SQLException
+    {
+        InternetSong song = new InternetSong();
+        song.location = result.getURL("url");
+        song.title = result.getString("title");
+        song.artists =
+                Arrays.stream(result.getString("artists").split(";"))
+                      .map(String::trim).toArray(String[]::new);
+        song.trackNum = result.getInt("track");
+        song.disc = result.getInt("disc");
+        song.duration = result.getLong("duration");
+        try
+        {
+            getAlbumProvider().joinUpdate();
+            song.album = getAlbumProvider().getAlbumByName(result.getString(
+                    "album"));
+        }
+        catch (InterruptedException e)
+        {
+            logger.error("Couldn't wait for album provider for song {}", song
+                    , e);
+        }
+        return song;
+    }
+
+    /**
+     * Called to obtain the properties of an object to write.
+     *
+     * @param item - The item to serialize.
+     * @return Properties to write.
+     */
+    @Override
+    protected Map<String, Object> serializeItem(InternetSong item)
+    {
+        LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+        map.put("url", item.location);
+        map.put("title", item.title);
+        map.put("artists", Arrays.stream(item.artists).reduce("",
+                (s1, s2) -> s1 + ";" + s2));
+        map.put("track", item.trackNum);
+        map.put("disc", item.disc);
+        map.put("duration", item.duration);
+        map.put("album",
+                Optional.ofNullable(item.album).map(a -> a.name).orElse(null));
+        return map;
+    }
+
+    /**
+     * Converts a piece of data into a string that will display in the update
+     * text.
+     *
+     * @param data - The data to stringify.
+     * @return A string representation of the data being updated.
+     */
+    @Override
+    protected String stringifyResult(InternetSong data)
+    {
+        return Optional.ofNullable(data.album).map(a -> a.name).orElse(null) +
+                "/" + data.title;
+    }
+
+    /**
+     * A callback for when the database scan is complete.
+     * <p>
+     * Note that this method is called from the same thread that the scanner is
+     * from.
+     * </p>
+     *
+     * @return A fork-join task to invoke. This may be null.
+     */
+    @Override
+    protected ForkJoinTask[] onComplete()
+    {
+        return null;
+    }
+
+    public ForkJoinTask<InternetSong> addSong(URL url)
+    {
+        AddInternetTask task = new AddInternetTask(url);
+        this.service.execute(task);
+        return task;
+    }
+
+    private class AddInternetTask extends ForkJoinTask<InternetSong>
+    {
+        private final URL loc;
+        private InternetSong item;
+
+        public AddInternetTask(URL song)
+        {
+            this.loc = song;
+        }
+
+        /**
+         * Returns the result that would be returned by {@link #join}, even if
+         * this task completed abnormally, or {@code null} if this task is not
+         * known to have been completed.  This method is designed to aid
+         * debugging, as well as to support extensions. Its use in any other
+         * context is discouraged.
+         *
+         * @return the result, or {@code null} if not completed
+         */
+        @Override
+        public InternetSong getRawResult()
+        {
+            return this.item;
+        }
+
+        /**
+         * Forces the given value to be returned as a result.  This method is
+         * designed to support extensions, and should not in general be called
+         * otherwise.
+         *
+         * @param value the value
+         */
+        @Override
+        protected void setRawResult(InternetSong value)
+        {
+            this.item = value;
+        }
+
+        /**
+         * Immediately performs the base action of this task and returns true
+         * if, upon return from this method, this task is guaranteed to have
+         * completed. This method may return false otherwise, to indicate that
+         * this task is not necessarily complete (or is not known to be
+         * complete), for example in asynchronous actions that require explicit
+         * invocations of completion methods. This method may also throw an
+         * (unchecked) exception to indicate abnormal exit. This method is
+         * designed to support extensions, and should not in general be called
+         * otherwise.
+         *
+         * @return {@code true} if this task is known to have completed normally
+         */
+        @Override
+        protected boolean exec()
+        {
+            InternetSong data;
+            try
             {
-                updating.set(true);
+                data =
+                        (InternetSong) Browser.getInstance().sendObject(new QuerySongData(this.loc)).get();
+            }
+            catch (InterruptedException | ExecutionException | IOException e)
+            {
+                this.completeExceptionally(e);
+                return false;
+            }
+            if (data != null)
+            {
                 try
                 {
-                    logger.debug("Querying database.");
-                    /*
-                     * Check if the table exists
-                     */
-                    synchronized (DatabaseManager.getDb())
-                    {
-                        /*
-                         * Make sure that a "null" album is available
-                         */
-
-                        if (albums.get(null) == null)
-                        {
-                            album = new Album();
-                            album.name = "Unknown";
-                            albums.put(null, album);
-                        }
-
-                        if (albums.get("Unknown") == null)
-                        {
-                            albums.put("Unknown", albums.get(null));
-                        }
-
-                        state = DatabaseManager.getDb().createStatement();
-                        result = state
-                                .executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='INTERNET_ALBUMS';");
-                        if (!result.next())
-                        {
-                            logger.debug("Creating album table.");
-                            /*
-                             * Create the table
-                             */
-                            state.executeUpdate("CREATE TABLE INTERNET_ALBUMS" +
-                                    "(ALBUM TEXT PRIMARY KEY NOT NULL," +
-                                    "ARTISTS TEXT," +
-                                    "YEAR INTEGER," +
-                                    "GENRES TEXT," +
-                                    "TRACKS INTEGER," +
-                                    "DISCS INTEGER);");
-                        }
-                        else
-                        {
-                            result = state
-                                    .executeQuery("SELECT * FROM INTERNET_ALBUMS;");
-                            while (result.next())
-                            {
-                                album = albums.get(result.getString("album"));
-                                if (album == null)
-                                {
-                                    album = new Album();
-                                    album.name = result.getString("album");
-                                    albums.put(album.name, album);
-                                }
-                                album.artists = Optional
-                                        .ofNullable(result.getString("artists"))
-                                        .map(s -> s.split(";"))
-                                        .orElse(new String[0]);
-                                album.year = result.getInt("year");
-                                album.genres = Optional
-                                        .ofNullable(result.getString("genres"))
-                                        .map(s -> s.split(";"))
-                                        .orElse(new String[0]);
-                                album.totalTracks = result.getInt("tracks");
-                                album.totalDiscs = result.getInt("discs");
-                                numAlbums++;
-                            }
-                        }
-                        result = state
-                                .executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='INTERNET_SONGS';");
-                        if (!result.next())
-                        {
-                            logger.debug("Creating song table.");
-                            /*
-                             * Create the table
-                             */
-                            state.executeUpdate("CREATE TABLE INTERNET_SONGS" +
-                                    "(URL TEXT PRIMARY KEY NOT NULL," +
-                                    "TITLE TEXT," +
-                                    "ARTISTS TEXT," +
-                                    "TRACK INTEGER," +
-                                    "DISC INTEGER," +
-                                    "DURATION BIGINT," +
-                                    "ALBUM TEXT);");
-                        }
-                        else
-                        {
-                            result = state
-                                    .executeQuery("SELECT * FROM INTERNET_SONGS;");
-                            while (result.next())
-                            {
-                                if (result.getString("url") == null)
-                                {
-                                    continue;
-                                }
-                                URL url;
-                                try
-                                {
-                                    url = new URL(result.getString("url"));
-                                }
-                                catch (MalformedURLException e)
-                                {
-                                    logger.error("Could not parse URL " + result
-                                            .getString("url"), e);
-                                    continue;
-                                }
-                                song = songs.get(url);
-                                if (song == null)
-                                {
-                                    song = new InternetSong();
-                                    song.location = url;
-                                    songs.put(song.location, song);
-                                }
-                                song.title = result.getString("title");
-                                song.artists = Optional
-                                        .ofNullable(result.getString("artists"))
-                                        .map(s -> s.split(";"))
-                                        .orElse(new String[0]);
-                                song.trackNum = result.getInt("track");
-                                song.disc = result.getInt("disc");
-                                song.duration = result.getLong("duration");
-                                song.album = Optional
-                                        .ofNullable(result.getString("album"))
-                                        .map(albums::get)
-                                        .orElse(albums.get("Unknown"));
-                                numSongs++;
-                            }
-                        }
-                        state.close();
-                    }
+                    writeItem(data).get();
                 }
-                catch (SQLException e)
+                catch (InterruptedException | ExecutionException e)
                 {
-                    logger.error("Could not query SQL database.", e);
+                    this.completeExceptionally(e);
+                    return false;
                 }
-                logger.debug("Query complete, retrieved {} albums and {} songs", numAlbums, numSongs);
-                updatedSongs = 0;
-                totalUpdate = 0;
-                updating.set(false);
-                updating.notifyAll();
             }
-            triggerUpdateListeners();
+            this.complete(data);
+            return true;
         }
     }
 }

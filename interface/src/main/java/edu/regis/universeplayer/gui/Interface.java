@@ -4,6 +4,7 @@
 
 package edu.regis.universeplayer.gui;
 
+import edu.regis.universeplayer.PlayerEnvironment;
 import edu.regis.universeplayer.player.Player;
 import edu.regis.universeplayer.browser.Browser;
 import edu.regis.universeplayer.player.BrowserPlayer;
@@ -137,7 +138,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                         /**
                          * Invoked when a window has been closed.
                          *
-                         * @param e
+                         * @param e - Event data
                          */
                         @Override
                         public void windowClosed(WindowEvent e)
@@ -234,10 +235,12 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                                 @Override
                                 protected Void doInBackground() throws Exception
                                 {
-                                    QueryFuture<Void> command = PlayerManager.getPlayers().throwError(false);
+                                    QueryFuture<Void> command = PlayerManager
+                                            .getPlayers().throwError(false);
                                     try
                                     {
-                                        if (!command.getConfirmation().wasSuccessful())
+                                        if (!command.getConfirmation()
+                                                    .wasSuccessful())
                                         {
                                             logger.error("Could not run command",
                                                     command.getConfirmation()
@@ -295,7 +298,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                         if (this.isEnabled())
                         {
                             collectionTypes
-                                    .triggerSongDisplayListeners(new ArrayList<>(SongProvider.INSTANCE
+                                    .triggerSongDisplayListeners(new ArrayList<>(PlayerEnvironment.getSongs()
                                             .getSongs()));
                         }
                     }
@@ -311,7 +314,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 if (this.isEnabled())
                 {
                     collectionTypes
-                            .triggerCollectionDisplayListeners(CollectionType.albumArtist, SongProvider.INSTANCE
+                            .triggerCollectionDisplayListeners(CollectionType.albumArtist, PlayerEnvironment.getAlbums()
                                     .getAlbumArtists());
                 }
             }
@@ -327,7 +330,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 if (this.isEnabled())
                 {
                     collectionTypes
-                            .triggerCollectionDisplayListeners(CollectionType.album, SongProvider.INSTANCE
+                            .triggerCollectionDisplayListeners(CollectionType.album, PlayerEnvironment.getSongs()
                                     .getAlbums());
                 }
             }
@@ -343,7 +346,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 if (this.isEnabled())
                 {
                     collectionTypes
-                            .triggerCollectionDisplayListeners(CollectionType.genre, SongProvider.INSTANCE
+                            .triggerCollectionDisplayListeners(CollectionType.genre, PlayerEnvironment.getAlbums()
                                     .getGenres());
                 }
             }
@@ -359,7 +362,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 if (this.isEnabled())
                 {
                     collectionTypes
-                            .triggerCollectionDisplayListeners(CollectionType.year, SongProvider.INSTANCE
+                            .triggerCollectionDisplayListeners(CollectionType.year, PlayerEnvironment.getAlbums()
                                     .getYears());
                 }
             }
@@ -652,12 +655,14 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     }
 
     @Override
-    public void onUpdate(int updated, int totalUpdate, String updating)
+    public <T> void onUpdate(DataProvider<T> provider, int updated,
+                             int totalUpdate, String updating)
     {
         this.controls.setUpdateProgress(updated, totalUpdate, updating);
         if (updated == totalUpdate || totalUpdate == 0)
         {
-            Collection<Song> songs = SongProvider.INSTANCE.getSongs();
+            Collection<? extends Song> songs =
+                    PlayerEnvironment.getSongs().getSongs();
             logger.debug("Resetting the song provider with {} songs.",
                     songs.size());
             /*
