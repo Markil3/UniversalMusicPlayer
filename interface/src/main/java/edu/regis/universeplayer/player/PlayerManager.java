@@ -7,11 +7,13 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JOptionPane;
 
+import edu.regis.universeplayer.AbstractTask;
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
 import edu.regis.universeplayer.browserCommands.CommandConfirmation;
@@ -150,10 +152,10 @@ public class PlayerManager implements PlaybackListener
      */
     private <T> QueryFuture<T> getNullPlayer(String message, T returnValue)
     {
-        return new QueryFuture<T>()
+        return new QueryFuture<>()
         {
             @Override
-            public CommandConfirmation getConfirmation() throws CancellationException, ExecutionException, InterruptedException
+            public CommandConfirmation getConfirmation() throws CancellationException
             {
                 if (returnValue instanceof Throwable)
                 {
@@ -166,7 +168,7 @@ public class PlayerManager implements PlaybackListener
             }
 
             @Override
-            public CommandConfirmation getConfirmation(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
+            public CommandConfirmation getConfirmation(long timeout, TimeUnit unit)
             {
                 return this.getConfirmation();
             }
@@ -190,13 +192,13 @@ public class PlayerManager implements PlaybackListener
             }
 
             @Override
-            public T get() throws InterruptedException, ExecutionException
+            public T get()
             {
                 return returnValue;
             }
 
             @Override
-            public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
+            public T get(long timeout, TimeUnit unit)
             {
                 return this.get();
             }
@@ -211,16 +213,16 @@ public class PlayerManager implements PlaybackListener
      */
     private <T> QueryFuture<T> getNullPlayer(Throwable message, T returnValue)
     {
-        return new QueryFuture<T>()
+        return new QueryFuture<>()
         {
             @Override
-            public CommandConfirmation getConfirmation() throws CancellationException, ExecutionException, InterruptedException
+            public CommandConfirmation getConfirmation() throws CancellationException
             {
                 return new CommandConfirmation(message);
             }
 
             @Override
-            public CommandConfirmation getConfirmation(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
+            public CommandConfirmation getConfirmation(long timeout, TimeUnit unit)
             {
                 return this.getConfirmation();
             }
@@ -244,20 +246,20 @@ public class PlayerManager implements PlaybackListener
             }
 
             @Override
-            public T get() throws InterruptedException, ExecutionException
+            public T get()
             {
                 return returnValue;
             }
 
             @Override
-            public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
+            public T get(long timeout, TimeUnit unit)
             {
                 return this.get();
             }
         };
     }
 
-    public QueryFuture<Void> playSong(Song song)
+    public ForkJoinTask<Void> playSong(Song song)
     {
         if (this.currentSong != null)
         {
@@ -274,16 +276,24 @@ public class PlayerManager implements PlaybackListener
         return this.currentPlayer.loadSong(song);
     }
 
-    public QueryFuture<PlaybackStatus> getStatus()
+    public ForkJoinTask<PlaybackStatus> getStatus()
     {
         if (this.currentPlayer != null)
         {
             return this.currentPlayer.getStatus();
         }
-        return this.getNullPlayer("Command successful", PlaybackStatus.EMPTY);
+        return new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                complete(PlaybackStatus.EMPTY);
+                return true;
+            }
+        };
     }
 
-    public QueryFuture<Void> seek(float time)
+    public ForkJoinTask<Void> seek(float time)
     {
         if (this.currentPlayer != null)
         {
@@ -292,7 +302,7 @@ public class PlayerManager implements PlaybackListener
         return null;
     }
 
-    public QueryFuture<Void> play()
+    public ForkJoinTask<Void> play()
     {
         if (this.currentPlayer != null && this.currentSong != null)
         {
@@ -301,7 +311,7 @@ public class PlayerManager implements PlaybackListener
         return null;
     }
 
-    public QueryFuture<Void> pause()
+    public ForkJoinTask<Void> pause()
     {
         if (this.currentPlayer != null && this.currentSong != null)
         {
@@ -310,7 +320,7 @@ public class PlayerManager implements PlaybackListener
         return null;
     }
 
-    public QueryFuture<Void> toggle()
+    public ForkJoinTask<Void> toggle()
     {
         if (this.currentPlayer != null && this.currentSong != null)
         {
@@ -319,7 +329,7 @@ public class PlayerManager implements PlaybackListener
         return null;
     }
 
-    public QueryFuture<Void> stopSong()
+    public ForkJoinTask<Void> stopSong()
     {
         if (this.currentPlayer != null && this.currentSong != null)
         {
@@ -370,14 +380,22 @@ public class PlayerManager implements PlaybackListener
      *                script or a background script.
      * @return The command future.
      */
-    public QueryFuture<Void> throwError(boolean forward)
+    public ForkJoinTask<Void> throwError(boolean forward)
     {
         BrowserPlayer player =
                 (BrowserPlayer) this.players.get(InternetSong.class);
         if (player == null)
         {
-            return this.getNullPlayer(new NullPointerException(
-                    "No browser found"), null);
+            return new AbstractTask<>()
+            {
+                @Override
+                protected boolean exec()
+                {
+                    completeExceptionally(new NullPointerException("Couldn't " +
+                            "find internet player"));
+                    return false;
+                }
+            };
         }
         return player.throwError(forward);
     }

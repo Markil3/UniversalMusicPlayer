@@ -10,6 +10,7 @@ import edu.regis.universeplayer.browserCommands.QueryFuture;
 import edu.regis.universeplayer.data.Song;
 
 import java.util.HashMap;
+import java.util.concurrent.ForkJoinTask;
 
 /**
  * This interface serves as the connection to a music player of some sort, whether it be
@@ -34,33 +35,33 @@ public interface Player<T extends Song>
      * @param song - The song to load.
      * @return A confirmation of whether the command was successful or not.
      */
-    QueryFuture<Void> loadSong(T song);
+    ForkJoinTask<Void> loadSong(T song);
     
     /**
      * Enables playback of the current song, if one is active.
      *
      * @return A confirmation of whether the command was successful or not.
      */
-    QueryFuture<Void> play();
+    ForkJoinTask<Void> play();
     
     /**
      * Pauses playback of the current song.
      *
      * @return A confirmation of whether the command was successful or not.
      */
-    QueryFuture<Void> pause();
+    ForkJoinTask<Void> pause();
     
     /**
      * Toggles between playing and pausing the current song.
      *
      * @return A confirmation of whether the command was successful or not.
      */
-    QueryFuture<Void> togglePlayback();
+    ForkJoinTask<Void> togglePlayback();
     
     /**
      * Stops playback of the current song.
      */
-    QueryFuture<Void> stopSong();
+    ForkJoinTask<Void> stopSong();
     
     /**
      * Sets the current song time to the specified position.
@@ -68,34 +69,34 @@ public interface Player<T extends Song>
      * @param time - The specified time in the song, in seconds.
      * @return A confirmation of whether the command was successful or not.
      */
-    QueryFuture<Void> seek(float time);
+    ForkJoinTask<Void> seek(float time);
     
     /**
      * Obtains the player's current playback status.
      * @return A future for the request.
      */
-    QueryFuture<PlaybackStatus> getStatus();
+    ForkJoinTask<PlaybackStatus> getStatus();
     
     /**
      * Obtains the time we are currently at in the current song.
      *
      * @return - The current song position in seconds, or -1 if no song is playing.
      */
-    QueryFuture<Float> getCurrentTime();
+    ForkJoinTask<Float> getCurrentTime();
     
     /**
      * Gets the length of the current song.
      *
      * @return The song length, in seconds.
      */
-    QueryFuture<Float> getLength();
+    ForkJoinTask<Float> getLength();
     
     /**
      * Closes the player.
      *
      * @return A confirmation of whether the player was successfully closed.
      */
-    QueryFuture<Void> close();
+    ForkJoinTask<Void> close();
     
     /**
      * Adds a listener for playback status updates.

@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinTask;
 
 /**
  * The Interface class serves as the primary GUI that the player interacts
@@ -75,8 +76,6 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
      * A reference to the player controls pane.
      */
     private final PlayerControls controls;
-
-    private int currentPlayer = -1;
 
     public static Interface getInstance()
     {
@@ -230,41 +229,23 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                                  * thread.
                                  *
                                  * @return the computed result
-                                 * @throws Exception if unable to compute a result
                                  */
                                 @Override
-                                protected Void doInBackground() throws Exception
+                                protected Void doInBackground()
                                 {
-                                    QueryFuture<Void> command = PlayerManager
+                                    ForkJoinTask<Void> command = PlayerManager
                                             .getPlayers().throwError(false);
-                                    try
+                                    command.join();
+                                    if (command.isCompletedAbnormally())
                                     {
-                                        if (!command.getConfirmation()
-                                                    .wasSuccessful())
-                                        {
-                                            logger.error("Could not run command",
-                                                    command.getConfirmation()
-                                                           .getError());
-                                            JOptionPane
-                                                    .showMessageDialog(Interface.this,
-                                                            command.getConfirmation()
-                                                                   .getError(),
-                                                            command.getConfirmation()
-                                                                   .getMessage(),
-                                                            JOptionPane.ERROR_MESSAGE);
-                                        }
-                                    }
-                                    catch (ExecutionException | InterruptedException executionException)
-                                    {
-                                        logger.error("Error" +
-                                                " creating " +
-                                                "debug " +
-                                                "message", executionException);
+                                        logger.error("Could not run command",
+                                                command.getException());
                                         JOptionPane
-                                                .showMessageDialog(Interface.this, executionException
-                                                        .getMessage(), langs
-                                                        .getString(
-                                                                "error.command"), JOptionPane.ERROR_MESSAGE);
+                                                .showMessageDialog(Interface.this,
+                                                        command.getException(),
+                                                        command.getException()
+                                                               .getMessage(),
+                                                        JOptionPane.ERROR_MESSAGE);
                                     }
                                     return null;
                                 }
@@ -298,7 +279,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                         if (this.isEnabled())
                         {
                             collectionTypes
-                                    .triggerSongDisplayListeners(new ArrayList<>(PlayerEnvironment.getSongs()
+                                    .triggerSongDisplayListeners(new ArrayList<>(PlayerEnvironment
+                                            .getSongs()
                                             .getSongs()));
                         }
                     }
@@ -314,7 +296,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 if (this.isEnabled())
                 {
                     collectionTypes
-                            .triggerCollectionDisplayListeners(CollectionType.albumArtist, PlayerEnvironment.getAlbums()
+                            .triggerCollectionDisplayListeners(CollectionType.albumArtist, PlayerEnvironment
+                                    .getAlbums()
                                     .getAlbumArtists());
                 }
             }
@@ -330,7 +313,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 if (this.isEnabled())
                 {
                     collectionTypes
-                            .triggerCollectionDisplayListeners(CollectionType.album, PlayerEnvironment.getSongs()
+                            .triggerCollectionDisplayListeners(CollectionType.album, PlayerEnvironment
+                                    .getSongs()
                                     .getAlbums());
                 }
             }
@@ -346,7 +330,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 if (this.isEnabled())
                 {
                     collectionTypes
-                            .triggerCollectionDisplayListeners(CollectionType.genre, PlayerEnvironment.getAlbums()
+                            .triggerCollectionDisplayListeners(CollectionType.genre, PlayerEnvironment
+                                    .getAlbums()
                                     .getGenres());
                 }
             }
@@ -362,7 +347,8 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                 if (this.isEnabled())
                 {
                     collectionTypes
-                            .triggerCollectionDisplayListeners(CollectionType.year, PlayerEnvironment.getAlbums()
+                            .triggerCollectionDisplayListeners(CollectionType.year, PlayerEnvironment
+                                    .getAlbums()
                                     .getYears());
                 }
             }

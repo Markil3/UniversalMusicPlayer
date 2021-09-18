@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 
 /**
  * This panel contains the buttons necessary for controlling the playback of
@@ -181,27 +182,15 @@ public class PlayerControls extends JPanel implements PlaybackListener
     private void seek(float value)
     {
         this.service.execute(() -> {
-            QueryFuture<Void> command = PlayerManager.getPlayers().seek(value);
-            try
-            {
-                if (command != null && !command.getConfirmation()
-                                               .wasSuccessful())
-                {
-                    logger.error("Could not run command",
-                            command.getConfirmation().getError());
-                    JOptionPane.showMessageDialog(this,
-                            command.getConfirmation().getError(),
-                            command.getConfirmation().getMessage(),
-                            JOptionPane.ERROR_MESSAGE);
-                }
-            }
-            catch (ExecutionException | InterruptedException e)
+            ForkJoinTask<Void> status = PlayerManager.getPlayers().seek(value);
+            status.join();
+            if (status.isCompletedAbnormally())
             {
                 logger.error("Could not run command",
-                        e);
+                        status.getException());
                 JOptionPane.showMessageDialog(this,
-                        e,
-                        e.getMessage(),
+                        status.getException(),
+                        status.getException().getMessage(),
                         JOptionPane.ERROR_MESSAGE);
             }
         });
@@ -213,16 +202,15 @@ public class PlayerControls extends JPanel implements PlaybackListener
         this.service.execute(() -> {
             try
             {
-                QueryFuture<PlaybackStatus> status =
+                ForkJoinTask status =
                         PlayerManager.getPlayers().getStatus();
-                CommandConfirmation confirmation = status.getConfirmation();
-                if (status.getConfirmation().wasSuccessful())
+                status.join();
+                if (status.isCompletedNormally())
                 {
-                    switch (status.get())
+                    switch ((PlaybackStatus) status.get())
                     {
-                    case PAUSED -> confirmation = PlayerManager.getPlayers()
-                                                               .play()
-                                                               .getConfirmation();
+                    case PAUSED -> status = PlayerManager.getPlayers()
+                                                               .play();
                     case STOPPED, EMPTY -> {
                         if (Queue.getInstance().size() > 0)
                         {
@@ -230,23 +218,30 @@ public class PlayerControls extends JPanel implements PlaybackListener
                                      .getCurrentSong() == null)
                             {
                                 Queue.getInstance().skipToSong(0);
+                                status = null;
                             }
                             else
                             {
-                                confirmation = PlayerManager.getPlayers().play()
-                                                            .getConfirmation();
+                                status = PlayerManager.getPlayers().play();
                             }
                         }
                     }
+                    default -> {
+                        status = null;
+                    }
+                    }
+                    if (status != null)
+                    {
+                        status.join();
                     }
                 }
-                if (confirmation != null && !confirmation.wasSuccessful())
+                if (status != null && status.isCompletedAbnormally())
                 {
                     logger.error("Could not run command",
-                            confirmation.getError());
+                            status.getException());
                     JOptionPane.showMessageDialog(this,
-                            confirmation.getError(),
-                            confirmation.getMessage(),
+                            status.getException(),
+                            status.getException().getMessage(),
                             JOptionPane.ERROR_MESSAGE);
                 }
             }
@@ -266,25 +261,25 @@ public class PlayerControls extends JPanel implements PlaybackListener
         this.service.execute(() -> {
             try
             {
-                QueryFuture<PlaybackStatus> status =
+                ForkJoinTask status =
                         PlayerManager.getPlayers().getStatus();
-                CommandConfirmation confirmation = status.getConfirmation();
-                if (status.getConfirmation().wasSuccessful())
+                status.join();
+                if (status.isCompletedNormally())
                 {
                     if (status.get() == PlaybackStatus.PLAYING)
                     {
-                        confirmation =
-                                PlayerManager.getPlayers().pause()
-                                             .getConfirmation();
+                        status =
+                                PlayerManager.getPlayers().pause();
+                        status.join();
                     }
                 }
-                if (confirmation != null && !confirmation.wasSuccessful())
+                if (status.isCompletedAbnormally())
                 {
                     logger.error("Could not run command",
-                            confirmation.getError());
+                            status.getException());
                     JOptionPane.showMessageDialog(this,
-                            confirmation.getError(),
-                            confirmation.getMessage(),
+                            status.getException(),
+                            status.getException().getMessage(),
                             JOptionPane.ERROR_MESSAGE);
                 }
             }
@@ -307,19 +302,17 @@ public class PlayerControls extends JPanel implements PlaybackListener
         this.service.execute(() -> {
             try
             {
-                QueryFuture<PlaybackStatus> status =
+                ForkJoinTask status =
                         PlayerManager.getPlayers().getStatus();
-                CommandConfirmation confirmation = status.getConfirmation();
-                if (status.getConfirmation().wasSuccessful())
+                status.join();
+                if (status.isCompletedNormally())
                 {
-                    switch (status.get())
+                    switch ((PlaybackStatus) status.get())
                     {
-                    case PAUSED -> confirmation = PlayerManager.getPlayers()
-                                                               .play()
-                                                               .getConfirmation();
-                    case PLAYING -> confirmation = PlayerManager.getPlayers()
-                                                                .pause()
-                                                                .getConfirmation();
+                    case PAUSED -> status = PlayerManager.getPlayers()
+                                                               .play();
+                    case PLAYING -> status = PlayerManager.getPlayers()
+                                                                .pause();
                     case STOPPED, EMPTY -> {
                         if (Queue.getInstance().size() > 0)
                         {
@@ -327,24 +320,29 @@ public class PlayerControls extends JPanel implements PlaybackListener
                                      .getCurrentSong() == null)
                             {
                                 Queue.getInstance().skipToSong(0);
+                                status = null;
                             }
                             else
                             {
-                                confirmation = PlayerManager.getPlayers().play()
-                                                            .getConfirmation();
+                                status = PlayerManager.getPlayers().play();
                             }
                         }
                     }
+                    default -> status = null;
+                    }
+                    if (status != null)
+                    {
+                        status.join();
                     }
                 }
-                if (confirmation != null && !confirmation.wasSuccessful())
+                if (status != null && status.isCompletedAbnormally())
                 {
-                    JOptionPane.showMessageDialog(this,
-                            confirmation.getError(),
-                            confirmation.getMessage(),
-                            JOptionPane.ERROR_MESSAGE);
                     logger.error("Could not run command",
-                            confirmation.getError());
+                            status.getException());
+                    JOptionPane.showMessageDialog(this,
+                            status.getException(),
+                            status.getException().getMessage(),
+                            JOptionPane.ERROR_MESSAGE);
                 }
             }
             catch (ExecutionException | InterruptedException e)

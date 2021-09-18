@@ -5,6 +5,7 @@ package edu.regis.universeplayer.player;
 
 import com.intervigil.wave.WaveReader;
 
+import edu.regis.universeplayer.AbstractTask;
 import edu.regis.universeplayer.PlaybackInfo;
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
@@ -48,14 +49,13 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     private final MediaPlayerFactory playerFactory;
     private final AudioPlayerComponent player;
 
+    private final ForkJoinPool service = new ForkJoinPool();
     private final LinkedList<PlaybackListener> listeners = new LinkedList<>();
 
     private int currentId;
 
     private LocalSong currentSong;
     private AudioFile currentFile;
-
-    private final ExecutorService service = Executors.newSingleThreadExecutor();
 
     public LocalPlayer()
     {
@@ -118,112 +118,196 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
     }
 
     @Override
-    public QueryFuture<Void> loadSong(LocalSong song)
+    public ForkJoinTask<Void> loadSong(LocalSong song)
     {
-        if (this.currentSong != null)
+        return this.service.submit(new AbstractTask<>()
         {
-            this.stopSong();
-        }
-        this.currentSong = song;
-        if (!this.player.mediaPlayer().media()
-                        .play(song.file.getAbsolutePath()))
-        {
-            return new NullFuture<>(new RuntimeException("Could not play " +
-                    "song " + song));
-        }
-        else
-        {
-            return new NullFuture<>();
-        }
+            @Override
+            protected boolean exec()
+            {
+                if (currentSong != null)
+                {
+                    stopSong();
+                }
+                currentSong = song;
+                if (!player.mediaPlayer().media()
+                           .play(song.file.getAbsolutePath()))
+                {
+                    this.completeExceptionally(new RuntimeException("Could not play " +
+                            "song " + song));
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        });
     }
 
     @Override
-    public QueryFuture<Void> play()
+    public ForkJoinTask<Void> play()
+    {
+        this.player.mediaPlayer().submit(() -> this.player.mediaPlayer()
+                                                          .controls()
+                                                          .play());
+        return new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                return true;
+            }
+        };
+    }
+
+    @Override
+    public ForkJoinTask<Void> pause()
     {
         this.player.mediaPlayer()
-                   .submit((WrappedRunnable) () -> this.player.mediaPlayer()
-                                                              .controls()
-                                                              .play());
-        return new NullFuture<>();
+                   .submit(() -> this.player.mediaPlayer()
+                                            .controls()
+                                            .pause());
+        return new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                return true;
+            }
+        };
     }
 
     @Override
-    public QueryFuture<Void> pause()
+    public ForkJoinTask<Void> togglePlayback()
+    {
+        return this.service.submit(new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                ForkJoinTask<Void> command;
+                if (player.mediaPlayer().status().isPlaying())
+                {
+                    command = pause();
+                }
+                else
+                {
+                    command = play();
+                }
+                command.join();
+                if (command.isCompletedAbnormally())
+                {
+                    this.completeExceptionally(command.getException());
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        });
+    }
+
+    @Override
+    public ForkJoinTask<Void> stopSong()
     {
         this.player.mediaPlayer()
-                   .submit((WrappedRunnable) () -> this.player.mediaPlayer()
-                                                              .controls()
-                                                              .pause());
-        return new NullFuture<>();
+                   .submit(() -> this.player.mediaPlayer()
+                                            .controls()
+                                            .stop());
+        return new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                return true;
+            }
+        };
     }
 
     @Override
-    public QueryFuture<Void> togglePlayback()
-    {
-        if (this.player.mediaPlayer().status().isPlaying())
-        {
-            return this.pause();
-        }
-        else
-        {
-            return this.play();
-        }
-    }
-
-    @Override
-    public QueryFuture<Void> stopSong()
+    public ForkJoinTask<Void> seek(float time)
     {
         this.player.mediaPlayer()
-                   .submit((WrappedRunnable) () -> this.player.mediaPlayer()
-                                                              .controls()
-                                                              .stop());
-        return new NullFuture<>();
-    }
-
-    @Override
-    public QueryFuture<Void> seek(float time)
-    {
-        this.player.mediaPlayer()
-                   .submit((WrappedRunnable) () -> this.player.mediaPlayer()
-                                                              .controls()
-                                                              .setTime((long) (time * 1000)));
-        return new NullFuture<>();
-    }
-
-    @Override
-    public QueryFuture<PlaybackStatus> getStatus()
-    {
-        PlaybackStatus returnStatus;
-        StatusApi status = this.player.mediaPlayer().status();
-        switch (status.state())
+                   .submit(() -> this.player.mediaPlayer()
+                                            .controls()
+                                            .setTime((long) (time * 1000)));
+        return new AbstractTask<>()
         {
-        case NOTHING_SPECIAL -> returnStatus = PlaybackStatus.EMPTY;
-        case PLAYING -> returnStatus = PlaybackStatus.PLAYING;
-        case PAUSED -> returnStatus = PlaybackStatus.PAUSED;
-        default -> returnStatus = PlaybackStatus.STOPPED;
-        }
-        return new NullFuture<>(returnStatus);
+            @Override
+            protected boolean exec()
+            {
+                return true;
+            }
+        };
     }
 
     @Override
-    public QueryFuture<Float> getCurrentTime()
+    public ForkJoinTask<PlaybackStatus> getStatus()
     {
-        return new NullFuture<>(this.player.mediaPlayer().status()
-                                           .time() / 1000F);
+        return this.service.submit(new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                PlaybackStatus returnStatus;
+                StatusApi status = player.mediaPlayer().status();
+                switch (status.state())
+                {
+                case NOTHING_SPECIAL -> returnStatus = PlaybackStatus.EMPTY;
+                case PLAYING -> returnStatus = PlaybackStatus.PLAYING;
+                case PAUSED -> returnStatus = PlaybackStatus.PAUSED;
+                default -> returnStatus = PlaybackStatus.STOPPED;
+                }
+                this.complete(returnStatus);
+                return true;
+            }
+        });
     }
 
     @Override
-    public QueryFuture<Float> getLength()
+    public ForkJoinTask<Float> getCurrentTime()
     {
-        return new NullFuture<>(this.player.mediaPlayer().status()
-                                           .length() / 1000F);
+        return this.service.submit(new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                complete(player.mediaPlayer().status()
+                           .time() / 1000F);
+                return true;
+            }
+        });
     }
 
     @Override
-    public QueryFuture<Void> close()
+    public ForkJoinTask<Float> getLength()
     {
-        this.player.release();
-        return new NullFuture<>();
+        return this.service.submit(new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                complete(player.mediaPlayer().status()
+                                    .length() / 1000F);
+                return true;
+            }
+        });
+    }
+
+    @Override
+    public ForkJoinTask<Void> close()
+    {
+        return this.service.submit(new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                player.release();
+                return true;
+            }
+        });
     }
 
     @Override

@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Scanner;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -149,66 +151,47 @@ public class PlayerEnvironment
 
         Queue queue = Queue.getInstance();
         PlayerManager playback = PlayerManager.getPlayers();
-        queue.addSongChangeListener(queue1 -> {
-            QueryFuture<Void> command = PlayerManager.getPlayers()
-                                                     .stopSong();
-            try
+        queue.addSongChangeListener(queue1 -> ForkJoinPool.commonPool().submit(() -> {
+            ForkJoinTask<Void> command = PlayerManager.getPlayers()
+                                                      .stopSong();
+            command.join();
+            if (command.isCompletedAbnormally())
             {
-                if (command != null && !command.getConfirmation()
-                                               .wasSuccessful())
+                logger.error("Could not run command",
+                        command.getException());
+                if (Interface.getInstance() != null)
                 {
+                    JOptionPane
+                            .showMessageDialog(Interface.getInstance(),
+                                    command.getException(),
+                                    command.getException().getMessage(),
+                                    JOptionPane.ERROR_MESSAGE);
+                }
+            }
+            else if (queue1.getCurrentSong() != null)
+            {
+                command =
+                        PlayerManager.getPlayers()
+                                     .playSong(queue1.getCurrentSong());
+                command.join();
+                if (command.isCompletedAbnormally())
+                {
+                    logger.error("Could not run command",
+                            command.getException());
                     if (Interface.getInstance() != null)
                     {
                         JOptionPane
                                 .showMessageDialog(Interface.getInstance(),
-                                        command.getConfirmation()
-                                               .getError(),
-                                        command.getConfirmation()
-                                               .getMessage(),
+                                        command.getException(),
+                                        command.getException().getMessage(),
                                         JOptionPane.ERROR_MESSAGE);
                     }
-                    logger.error("Could not run command",
-                            command.getConfirmation().getError());
-                }
-                else if (queue1.getCurrentSong() != null)
-                {
-                    command =
-                            PlayerManager.getPlayers()
-                                         .playSong(queue1.getCurrentSong());
-                    if (!command.getConfirmation().wasSuccessful())
-                    {
-                        if (Interface.getInstance() != null)
-                        {
-                            JOptionPane.showMessageDialog(Interface
-                                            .getInstance(),
-                                    command.getConfirmation().getError(),
-                                    command.getConfirmation().getMessage(),
-                                    JOptionPane.ERROR_MESSAGE);
-                        }
-                        logger.error("Could not run command",
-                                command.getConfirmation().getError());
-                    }
-                    else
-                    {
-                    }
                 }
             }
-            catch (ExecutionException | InterruptedException e)
-            {
-                logger.error("Could not get current playback status", e);
-                if (Interface.getInstance() != null)
-                {
-                    JOptionPane
-                            .showMessageDialog(Interface.getInstance(), e
-                                            .getMessage()
-                                    , langs
-                                            .getString(
-                                                    "error.command"), JOptionPane.ERROR_MESSAGE);
-                }
-            }
-        });
+        }));
         playback.addPlaybackListener(status -> {
-            logger.info("Receiving {} from {}", status.getInfo(), status.getSource());
+            logger.info("Receiving {} from {}", status.getInfo(), status
+                    .getSource());
             if (status.getInfo().getStatus() == PlaybackStatus.FINISHED)
             {
                 Queue.getInstance().skipNext();
@@ -411,16 +394,9 @@ public class PlayerEnvironment
                     out.println("Clearing");
                 }
                 case "status" -> {
-                    QueryFuture<PlaybackStatus> status =
+                    ForkJoinTask<PlaybackStatus> status =
                             PlayerManager.getPlayers().getStatus();
-                    try
-                    {
-                        out.println(status.get());
-                    }
-                    catch (InterruptedException | ExecutionException e)
-                    {
-                        e.printStackTrace(out);
-                    }
+                    out.println(status.join());
                 }
                 case "song" -> {
                     Song song = PlayerManager.getPlayers().getCurrentSong();
