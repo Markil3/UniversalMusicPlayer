@@ -63,3 +63,9 @@ artifacts {
     }
     install(distTar)
 }
+
+processResources {
+    filesMatching("**/log4j2.xml") {
+        expand(rootProject.properties)
+    }
+}

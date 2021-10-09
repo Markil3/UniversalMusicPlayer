@@ -131,8 +131,8 @@ public class PlayerEnvironment
         }
     }
 
-    private static void init(HashMap<String, Object> ops,
-                             ArrayList<String> params)
+    public static void init(Map<String, Object> ops,
+                             List<String> params)
     {
         /*
          * Add this just in case of a crash or something. It won't work if the
@@ -154,25 +154,28 @@ public class PlayerEnvironment
         queue.addSongChangeListener(queue1 -> ForkJoinPool.commonPool().submit(() -> {
             ForkJoinTask<Void> command = PlayerManager.getPlayers()
                                                       .stopSong();
-            command.join();
-            if (command.isCompletedAbnormally())
+            if (command != null)
             {
-                logger.error("Could not run command",
-                        command.getException());
-                if (Interface.getInstance() != null)
+                command.join();
+                if (command.isCompletedAbnormally())
                 {
-                    JOptionPane
-                            .showMessageDialog(Interface.getInstance(),
-                                    command.getException(),
-                                    command.getException().getMessage(),
-                                    JOptionPane.ERROR_MESSAGE);
+                    logger.error("Could not run command",
+                            command.getException());
+                    if (Interface.getInstance() != null)
+                    {
+                        JOptionPane
+                                .showMessageDialog(Interface.getInstance(),
+                                        command.getException(),
+                                        command.getException().getMessage(),
+                                        JOptionPane.ERROR_MESSAGE);
+                    }
                 }
             }
-            else if (queue1.getCurrentSong() != null)
+            if (queue1.getCurrentSong() != null)
             {
                 command =
                         PlayerManager.getPlayers()
-                                     .playSong(queue1.getCurrentSong());
+                                .playSong(queue1.getCurrentSong());
                 command.join();
                 if (command.isCompletedAbnormally())
                 {
@@ -249,7 +252,6 @@ public class PlayerEnvironment
                     else
                     {
                         equals = args[i].length();
-                        valStr = null;
                     }
                     key = args[i].substring(2, equals);
                 }
@@ -478,7 +480,7 @@ public class PlayerEnvironment
                                            .map(Map.Entry::getKey)
                                            .collect(Collectors.toList());
                 Collections.reverse(songs);
-                out.println("Playing " + songs.toString());
+                out.println("Playing " + songs);
                 Queue.getInstance().addAll(songs);
             }
         }

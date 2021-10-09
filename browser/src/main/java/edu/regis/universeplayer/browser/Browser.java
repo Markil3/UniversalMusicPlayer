@@ -4,6 +4,9 @@
 
 package edu.regis.universeplayer.browser;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.DefaultLoggerContextAccessor;
+import org.apache.logging.log4j.core.LogEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,20 +14,27 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Arrays;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import edu.regis.universeplayer.ConfigManager;
+import edu.regis.universeplayer.Log;
 import edu.regis.universeplayer.browserCommands.BrowserConstants;
 import edu.regis.universeplayer.browserCommands.MessageRunner;
+import edu.regis.universeplayer.browserCommands.UpdateListener;
 
 public class Browser extends MessageRunner
 {
     private static final Logger logger = LoggerFactory.getLogger(Browser.class);
+    private static final Logger browserLogger =
+            LoggerFactory.getLogger("browser");
 
     private static Browser INSTANCE;
     private static final AtomicBoolean instanceWaiter = new AtomicBoolean();
@@ -116,6 +126,72 @@ public class Browser extends MessageRunner
         this.socket = socket;
         this.server = server;
         this.process = process;
+
+        /*
+         * Sends browser logs to the main log.
+         */
+        this.addUpdateListener((object, runner) ->
+        {
+            Log log;
+            LogEvent logEvent;
+            if (object instanceof Log)
+            {
+                log = (Log) object;
+                String methodName;
+                Class<?>[] types = null;
+                Object[] params = null;
+                if (log.message.length == 1)
+                {
+                    types = new Class<?>[]{String.class};
+                    params = new Object[]{log.message[0]};
+                }
+                else if (log.message.length == 2)
+                {
+                    types = new Class<?>[]{String.class, Object.class};
+                    params = new Object[]{log.message[0], log.message[1]};
+                }
+                else if (log.message.length == 3)
+                {
+                    types = new Class<?>[]{String.class, Object.class,
+                            Object[].class};
+                    params = new Object[]{log.message[0], log.message[1],
+                            log.message[1]};
+                }
+                else if (log.message.length > 4)
+                {
+                    types = new Class<?>[]{String.class, Object[].class};
+                    params = new Object[]{log.message[0],
+                            Arrays.copyOfRange(log.message, 1,
+                                    log.message.length)};
+                }
+                methodName = log.level.toLowerCase();
+                if (types != null)
+                {
+                    Method method = null;
+                    try
+                    {
+                        method = Logger.class.getMethod(methodName, types);
+                        method.invoke(LoggerFactory.getLogger(log.logger), params);
+                    }
+                    catch (NoSuchMethodException e)
+                    {
+                        /*
+                         * This can happen if a zero-argument message was
+                         * received. This is expected.
+                         */
+                    }
+                    catch (IllegalAccessException | InvocationTargetException e)
+                    {
+                        logger.error("Could not process logger message {}", log,
+                                e);
+                    }
+                }
+            }
+            else if (object instanceof LogEvent)
+            {
+                DefaultLoggerContextAccessor.INSTANCE.getLoggerContext().getRootLogger().get().log((LogEvent) object);
+            }
+        });
     }
 
     @Override

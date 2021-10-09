@@ -4,6 +4,7 @@
 
 package edu.regis.universeplayer.addon;
 
+import edu.regis.universeplayer.QueueAppender;
 import edu.regis.universeplayer.browserCommands.BrowserConstants;
 import edu.regis.universeplayer.browserCommands.MessageHandler;
 import org.apache.logging.log4j.core.LogEvent;
@@ -57,10 +58,10 @@ public class Main
                         /*
                          * Make sure that it is active.
                          */
-                        if (SocketAppender.hasLogs())
+                        if (QueueAppender.hasLogs())
                         {
                             lastPing = System.currentTimeMillis();
-                            for (LogEvent event : SocketAppender.retrieveLogEvents())
+                            for (LogEvent event : QueueAppender.retrieveLogEvents())
                             {
                                 this.sendUpdate(event);
                             }

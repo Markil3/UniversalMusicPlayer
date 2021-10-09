@@ -19,13 +19,13 @@
   },
 
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["logger.js", "defs/songs.js", "background.js"]
   },
 
   "content_scripts": [
     {
       "matches": ["*://*.youtube.com/watch?v=*"],
-      "js": ["foreground.js", "youtube.js"]
+      "js": ["jquery.js", "logger.js", "defs/songs.js", "foreground.js", "youtube.js"]
     }
   ],
 
@@ -33,5 +33,5 @@
     "default_icon": "icon.svg"
   },
 
-  "permissions": ["nativeMessaging"]
+  "permissions": ["nativeMessaging", "tabs"]
 }
