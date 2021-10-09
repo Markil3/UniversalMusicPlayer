@@ -79,7 +79,8 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
         BufferedInputStream browserIn = null;
         BufferedOutputStream browserOut = null;
         MessagePacket packet;
-        
+
+        boolean running = true;
         int messageNum = -1;
         byte[][] returnMessage;
         ByteBuffer numBuffer = ByteBuffer.allocate(4);
@@ -89,7 +90,7 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
             browserIn = new BufferedInputStream(this.input);
             browserOut = new BufferedOutputStream(this.output);
             
-            while (!this.onRun())
+            while (running && !this.onRun())
             {
                 /*
                  * Sends a messages
@@ -104,17 +105,19 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
                     {
                         messageNum = this.messagesSent;
                         packet.returnValue.index = messageNum;
-                        writeMessage(browserOut, messageNum, packet.message);
                         
                         synchronized (this.sentQueue)
                         {
                             this.sentQueue.put(messageNum, packet);
                             this.messagesSent++;
                         }
+
+                        writeMessage(browserOut, messageNum, packet.message);
                     }
                     catch (IOException e)
                     {
-                        logger.error("Could not send message " + messageNum + " " + new String(packet.message, StandardCharsets.UTF_8), e);
+                        logger.error("Could not send message {} {}", messageNum, new String(packet.message, StandardCharsets.UTF_8), e);
+                        running = false;
                     }
                 }
                 
@@ -183,6 +186,7 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
                 catch (IOException e)
                 {
                     logger.error("Could not retrieve message", e);
+                    running = false;
                 }
             }
         }
@@ -195,14 +199,11 @@ public abstract class MessageRunner implements Runnable, MessageSerializer
             /*
              * Release locks for any messages still waiting.
              */
-            synchronized (this.sendQueue)
+            synchronized (this.sentQueue)
             {
-                logger.debug("Clearing up {} messages", this.sendQueue.size());
-                while (this.sendQueue.size() > 0)
-                {
-                    packet = this.sendQueue.poll();
-                    packet.returnMessage = null;
-                }
+                logger.debug("Clearing up {} messages", this.sentQueue.size());
+                this.sentQueue.values().forEach(foundPacket -> foundPacket.returnMessage = new byte[0]);
+                this.sentQueue.clear();
             }
             synchronized (this.readLock)
             {

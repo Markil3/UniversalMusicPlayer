@@ -6,6 +6,7 @@ package edu.regis.universeplayer.addon;
 
 import edu.regis.universeplayer.browserCommands.BrowserConstants;
 import edu.regis.universeplayer.browserCommands.MessageHandler;
+import org.apache.logging.log4j.core.LogEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,7 +19,7 @@ import java.util.concurrent.Future;
 public class Main
 {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
-    
+
     public static void main(String[] args) throws IOException
     {
         MessageHandler interfaceLink;
@@ -32,14 +33,22 @@ public class Main
             try
             {
                 logger.debug("Setting up connection");
-                socket = new Socket(BrowserConstants.IP,BrowserConstants.PORT);
+                socket = new Socket(BrowserConstants.IP, BrowserConstants.PORT);
                 logger.debug("Connection established");
-    
+
                 Socket finalSocket = socket;
-                interfaceLink = new MessageHandler("InterfaceHandler", finalSocket.getInputStream(), finalSocket.getOutputStream()) {
+                interfaceLink = new MessageHandler("InterfaceHandler", finalSocket.getInputStream(), finalSocket.getOutputStream())
+                {
+                    private long lastPing = 0;
+
                     @Override
                     protected boolean onRun()
                     {
+                        /*
+                         * How many milliseconds must pass between browser
+                         * pings.
+                         */
+                        final long PING_RATE = 5000;
                         if (!finalSocket.isConnected() || finalSocket.isClosed() || finalSocket.isInputShutdown() || finalSocket.isOutputShutdown())
                         {
                             logger.debug("Interface socket closed, shutting down");
@@ -48,10 +57,22 @@ public class Main
                         /*
                          * Make sure that it is active.
                          */
-//                        this.sendUpdate("ping");
+                        if (SocketAppender.hasLogs())
+                        {
+                            lastPing = System.currentTimeMillis();
+                            for (LogEvent event : SocketAppender.retrieveLogEvents())
+                            {
+                                this.sendUpdate(event);
+                            }
+                        }
+                        else if (System.currentTimeMillis() - lastPing >= PING_RATE)
+                        {
+                            lastPing = System.currentTimeMillis();
+                            this.sendUpdate("ping");
+                        }
                         return false;
                     }
-    
+
                     @Override
                     protected void onClose()
                     {
@@ -72,20 +93,22 @@ public class Main
                  * Pretty much just forwards any messages to the browser and
                  * returns their value.
                  */
-                browserLink.addUpdateListener((update, link) -> {
+                browserLink.addUpdateListener((update, link) ->
+                {
                     logger.debug("Sending update {}", update);
                     interfaceLink.sendUpdate(update);
                 });
-                interfaceLink.addListener((providedValue, previousReturn) -> {
+                interfaceLink.addListener((providedValue, previousReturn) ->
+                {
                     logger.debug("Forwarding message to browser: {}", providedValue);
                     Object returnValue = browserLink.sendObject(providedValue).get();
                     logger.debug("Forwarding return to interface: {}", returnValue);
                     return returnValue;
                 });
-                
+
                 browserThread = new Thread(browserLink);
                 interfaceThread = new Thread(interfaceLink);
-                
+
                 logger.debug("Starting threads.");
                 browserThread.start();
                 interfaceThread.start();
@@ -136,7 +159,7 @@ public class Main
             }
         }
     }
-    
+
     private static void testMain() throws ExecutionException, InterruptedException
     {
         LinkedList<Future<Object>> requests = new LinkedList<>();

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  ~ Copyright (c) 2021 William Hubbard. All Rights Reserved.
+  -->
+<Configuration packages="edu.regis.universeplayer.browserCommands" status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_ERR">
+            <PatternLayout pattern="%c:%L %-5level - %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Root level="debug">
+            <AppenderRef ref="Console"/>
+        </Root>
+        <Logger name="BrowserRunner" level="info"/>
+    </Loggers>
+</Configuration>
