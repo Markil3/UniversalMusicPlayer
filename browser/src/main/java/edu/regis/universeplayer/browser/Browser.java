@@ -140,6 +140,10 @@ public class Browser extends MessageRunner
                 String methodName;
                 Class<?>[] types = null;
                 Object[] params = null;
+                if (log.message.length == 1 && !(log.message[0] instanceof String))
+                {
+                    log.message = new Object[] {"{}", log.message[0]};
+                }
                 if (log.message.length == 1)
                 {
                     types = new Class<?>[]{String.class};
@@ -184,6 +188,11 @@ public class Browser extends MessageRunner
                     {
                         logger.error("Could not process logger message {}", log,
                                 e);
+                    }
+                    catch (IllegalArgumentException e)
+                    {
+                        logger.error("Could not call logger {} with arguments {}", method,
+                                params);
                     }
                 }
             }

@@ -6,6 +6,7 @@ package edu.regis.universeplayer.data;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * This song represents a song found on the local file system.
@@ -29,6 +30,30 @@ public class LocalSong extends Song
      * File#lastModified()}.
      */
     public long lastMod;
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
+            return true;
+        }
+        if (!(o instanceof LocalSong localSong))
+        {
+            return false;
+        }
+        if (!super.equals(o))
+        {
+            return false;
+        }
+        return file.equals(localSong.file);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(super.hashCode(), file);
+    }
 
     @Override
     public int compareTo(Song o)

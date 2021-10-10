@@ -16,7 +16,7 @@ logger.pushUpdate = function (message)
     }
 };
 
-logger.log("Hello from Universal Music addon!")
+console.log("Hello from Universal Music addon!")
 
 /**
  * This variable contains a mapping of message IDs to the message promises they correspond to, as
@@ -178,11 +178,6 @@ function loadTab(url, pinned)
                 }
             }
         }, reject);
-    }).finally(() => {
-        if (!pinned)
-        {
-            browser.tabs.remove(chosen);
-        }
     });
 }
 

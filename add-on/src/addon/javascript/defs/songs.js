@@ -1,5 +1,6 @@
 class Album
 {
+    type = "edu.regis.universeplayer.data.Album";
     name;
     artists;
     year;
@@ -10,6 +11,7 @@ class Album
 
 class Song
 {
+    type = "edu.regis.universeplayer.data.Song";
     /**
      * The name of the song.
      */
@@ -34,11 +36,12 @@ class Song
     /**
      * A reference to the album this song is part of.
      */
-    album;
+    album = new Album();
 }
 
 class InternetSong extends Song
 {
+    type = "edu.regis.universeplayer.data.InternetSong";
     /**
      * The location of the song.
      */

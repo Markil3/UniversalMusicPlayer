@@ -6,6 +6,7 @@ package edu.regis.universeplayer.data;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Contains data for a song.
@@ -41,6 +42,28 @@ public class Song implements Comparable<Song>, Serializable
      * A reference to the album this song is part of.
      */
     public Album album;
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
+            return true;
+        }
+        if (!(o instanceof Song song))
+        {
+            return false;
+        }
+        return trackNum == song.trackNum && disc == song.disc && title.equals(song.title) && Arrays.equals(artists, song.artists) && album.equals(song.album);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        int result = Objects.hash(title, trackNum, disc, album);
+        result = 31 * result + Arrays.hashCode(artists);
+        return result;
+    }
 
     @Override
     public int compareTo(Song o)

@@ -57,18 +57,43 @@ class Logger {
     passLog(level, message)
     {
         let messageData;
-        if (message.length > 1 && typeof message[0] == "string")
+        if (message.length > 1)
         {
-            /*
-             * Format the initial string in a way that SLF4J can understand it.
-             */
-            message[0] = message[0].replaceAll(/%[a-z]/gi, "{}");
+            if (typeof message[0] == "string")
+            {
+                /*
+                 * Format the initial string in a way that SLF4J can understand it.
+                 */
+                message[0] = message[0].replaceAll(/%[a-z]/gi, "{}");
+            }
+        }
+        for (let i = 0; i < message.length; i++)
+        {
+            if (message[i] instanceof Error)
+            {
+                message[i] = {
+                    "type": "edu.regis.universeplayer.browserCommands.BrowserError",
+                    "name": message[i].name,
+                    "message": message[i].message,
+                    "fileName": message[i].fileName,
+                    "lineNumber": message[i].lineNumber,
+                    "columnNumber": message[i].columnNumber,
+                    "stack": message[i].stack
+                }
+            }
         }
         this.queuedMessages.push(new MessageData(this.name, level, message));
         message = this.queuedMessages.pop();
+        try
+        {
         while (message && this.pushUpdate(message))
         {
             message = this.queuedMessages.pop();
+        }
+        }
+        catch (e)
+        {
+            console.error("Could not post log message", e)
         }
         /*
          * If we popped a message but got here, then a message was not sent. Put it back.

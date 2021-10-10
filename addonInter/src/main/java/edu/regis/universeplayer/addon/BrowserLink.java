@@ -6,8 +6,7 @@ package edu.regis.universeplayer.addon;
 
 import com.google.gson.*;
 
-import edu.regis.universeplayer.browserCommands.CommandConfirmation;
-import edu.regis.universeplayer.browserCommands.MessageRunner;
+import edu.regis.universeplayer.browserCommands.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +36,8 @@ public class BrowserLink extends MessageRunner
         GsonBuilder builder = new GsonBuilder();
         builder.registerTypeAdapter(StackTraceElement.class, new StackTraceElementSerializer());
         builder.registerTypeAdapter(Throwable.class, new ThrowableSerializer());
+        builder.registerTypeAdapter(BrowserError.class, new BrowserErrorSerializer());
+        builder.registerTypeAdapter(CommandReturn.class, new CommandReturnSerializer());
         gson = builder.create();
     }
     
@@ -144,6 +145,7 @@ public class BrowserLink extends MessageRunner
      */
     private Object getMessage(JsonElement message) throws IOException
     {
+        logger.debug("Deserializing {}", message);
         if (message.isJsonPrimitive())
         {
             return getPrimitiveMessage((JsonPrimitive) message);

@@ -13,7 +13,7 @@ logger.pushUpdate = function (message)
     }
 };
 
-ylogger.debug("Loading youtube.js")
+console.debug("Loading youtube.js")
 var video;
 
 function onload()

@@ -4,6 +4,8 @@
 
 package edu.regis.universeplayer.player;
 
+import edu.regis.universeplayer.AbstractTask;
+import edu.regis.universeplayer.NumberPing;
 import edu.regis.universeplayer.PlaybackInfo;
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
@@ -32,6 +34,20 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
     private static final Logger logger = LoggerFactory
             .getLogger(BrowserPlayer.class);
 
+    /**
+     * The player instance. This should only be used for debugging..
+     */
+    private static BrowserPlayer INSTANCE;
+
+    /**
+     * Obtains the player instance. This should only be used for debugging.
+     */
+    public static BrowserPlayer getInstance()
+    {
+        return INSTANCE;
+    }
+
+    private final ForkJoinPool service = new ForkJoinPool();
     private final LinkedList<PlaybackListener> listeners = new LinkedList<>();
     private boolean error = false;
 
@@ -65,6 +81,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
 
     public BrowserPlayer()
     {
+        INSTANCE = this;
         Thread browserThread = new Thread(() -> {
             try
             {
@@ -87,37 +104,119 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
         return this.currentSong;
     }
 
-    @Override
-    public QueryFuture<Void> loadSong(InternetSong song)
+    /**
+     * Obtains data on a specified song.
+     *
+     * @param url - The url to get the data from.
+     * @return A confirmation of command success.
+     */
+    public ForkJoinTask<InternetSong> getSongData(URL url)
     {
-        try
+        return this.service.submit(new AbstractTask<>()
         {
-            return new ForwardedFuture(getBrowser()
-                    .sendObject(new CommandLoadSong(song.location)));
-        }
-        catch (IOException e)
+            @Override
+            protected boolean exec()
+            {
+                try
+                {
+                    Future<?> command =
+                            getBrowser()
+                                    .sendObject(new QuerySongData(url));
+                    CommandReturn<InternetSong> returnOb =
+                            (CommandReturn<InternetSong>) command
+                            .get();
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return false;
+                    }
+                    else
+                    {
+                        this.complete(returnOb.getReturnValue());
+                        return true;
+                    }
+                }
+                catch (IOException | InterruptedException | ExecutionException e)
+                {
+                    this.completeExceptionally(e);
+                    return false;
+                }
+            }
+        });
+    }
+
+    @Override
+    public ForkJoinTask<Void> loadSong(InternetSong song)
+    {
+        return this.service.submit(new AbstractTask<>()
         {
-            logger.error("Could not send message", e);
-            return null;
-        }
+            @Override
+            protected boolean exec()
+            {
+                try
+                {
+                    Future<?> command =
+                            getBrowser()
+                                    .sendObject(new CommandLoadSong(song.location));
+                    CommandReturn<Boolean> returnOb = (CommandReturn<Boolean>) command
+                            .get();
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return false;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
+                catch (IOException | InterruptedException | ExecutionException e)
+                {
+                    this.completeExceptionally(e);
+                    return false;
+                }
+            }
+        });
     }
 
     /**
      * Tells the browser process to shut down.
      */
     @Override
-    public QueryFuture<Void> close()
+    public ForkJoinTask<Void> close()
     {
-        try
+        return this.service.submit(new AbstractTask<>()
         {
-            return (QueryFuture<Void>) new ForwardedFuture(getBrowser()
-                    .sendObject(new CommandQuit()));
-        }
-        catch (IOException e)
-        {
-            logger.error("Could not send message", e);
-            return null;
-        }
+            @Override
+            protected boolean exec()
+            {
+                try
+                {
+                    Future<?> command =
+                            getBrowser()
+                                    .sendObject(new CommandQuit());
+                    CommandReturn<Boolean> returnOb = (CommandReturn<Boolean>) command
+                            .get();
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return false;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
+                catch (IOException | InterruptedException | ExecutionException e)
+                {
+                    this.completeExceptionally(e);
+                    return false;
+                }
+            }
+        });
     }
 
     /**
@@ -155,92 +254,201 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
     }
 
     @Override
-    public QueryFuture<Void> play()
+    public ForkJoinTask<Void> play()
     {
-        try
+        return this.service.submit(new AbstractTask<>()
         {
-            return new ForwardedFuture(getBrowser()
-                    .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PLAY)));
-        }
-        catch (IOException e)
-        {
-            logger.error("Could not send message", e);
-            return null;
-        }
-    }
-
-    @Override
-    public QueryFuture<Void> pause()
-    {
-        try
-        {
-            return new ForwardedFuture(getBrowser()
-                    .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE)));
-        }
-        catch (IOException e)
-        {
-            logger.error("Could not send message", e);
-            return null;
-        }
-    }
-
-    @Override
-    public QueryFuture<Void> togglePlayback()
-    {
-        try
-        {
-            QueryFuture<PlaybackStatus> future = this.getStatus();
-            switch (future.get())
+            @Override
+            protected boolean exec()
             {
-            case PLAYING -> {
-                return new ForwardedFuture(getBrowser()
-                        .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE)));
+                try
+                {
+                    Future<?> command =
+                            getBrowser()
+                                    .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PLAY));
+                    CommandReturn<Boolean> returnOb = (CommandReturn<Boolean>) command
+                            .get();
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return true;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
+                catch (IOException | InterruptedException | ExecutionException e)
+                {
+                    this.completeExceptionally(e);
+                    return false;
+                }
             }
-            case PAUSED, STOPPED, FINISHED -> {
-                return new ForwardedFuture(getBrowser()
-                        .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PLAY)));
-            }
-            }
-            return null;
-        }
-        catch (IOException | InterruptedException | ExecutionException e)
+        });
+    }
+
+    @Override
+    public ForkJoinTask<Void> pause()
+    {
+        return this.service.submit(new AbstractTask<>()
         {
-            logger.error("Could not send message", e);
-            return null;
-        }
+            @Override
+            protected boolean exec()
+            {
+                try
+                {
+                    Future<?> command =
+                            getBrowser()
+                                    .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE));
+                    CommandReturn<Boolean> returnOb = (CommandReturn<Boolean>) command
+                            .get();
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return false;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
+                catch (IOException | InterruptedException | ExecutionException e)
+                {
+                    this.completeExceptionally(e);
+                    return false;
+                }
+            }
+        });
+    }
+
+    @Override
+    public ForkJoinTask<Void> togglePlayback()
+    {
+        return this.service.submit(new AbstractTask<Void>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                try
+                {
+                    Future<?> command = getBrowser()
+                            .sendObject(new QueryStatus());
+                    CommandReturn<String> returnOb =
+                            (CommandReturn<String>) command.get();
+                    CommandReturn<?> confirmation;
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return false;
+                    }
+                    else
+                    {
+                        switch (PlaybackStatus
+                                .valueOf(returnOb.getReturnValue()))
+                        {
+                        case PLAYING -> command =
+                                getBrowser()
+                                        .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PAUSE));
+                        case PAUSED, STOPPED, FINISHED -> command = getBrowser()
+                                .sendObject(new CommandSetPlayback(CommandSetPlayback.Playback.PLAY));
+                        }
+                        confirmation =
+                                (CommandReturn<?>) command.get();
+                        if (!confirmation.getConfirmation().wasSuccessful())
+                        {
+                            this.completeExceptionally(returnOb
+                                    .getConfirmation().getError());
+                            return false;
+                        }
+                        else
+                        {
+                            return true;
+                        }
+                    }
+                }
+                catch (IOException | InterruptedException | ExecutionException e)
+                {
+                    this.completeExceptionally(e);
+                    return false;
+                }
+            }
+        });
     }
 
     /**
      * Stops playback of the current song.
      */
     @Override
-    public QueryFuture<Void> stopSong()
+    public ForkJoinTask<Void> stopSong()
     {
-        try
+        return this.service.submit(new AbstractTask<>()
         {
-            return new ForwardedFuture(getBrowser()
-                    .sendObject(new CommandLoadSong((URL) null)));
-        }
-        catch (IOException e)
-        {
-            logger.error("Could not send message", e);
-            return null;
-        }
+            @Override
+            protected boolean exec()
+            {
+                try
+                {
+                    Future<?> command =
+                            getBrowser()
+                                    .sendObject(new CommandLoadSong((URL) null));
+                    CommandReturn<Boolean> returnOb = (CommandReturn<Boolean>) command
+                            .get();
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return false;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
+                catch (IOException | InterruptedException | ExecutionException e)
+                {
+                    this.completeExceptionally(e);
+                    return false;
+                }
+            }
+        });
     }
 
     @Override
-    public QueryFuture<Void> seek(float time)
+    public ForkJoinTask<Void> seek(float time)
     {
-        try
+        return this.service.submit(new AbstractTask<>()
         {
-            return new ForwardedFuture(getBrowser()
-                    .sendObject(new CommandSeek(time)));
-        }
-        catch (IOException e)
-        {
-            logger.error("Could not send message", e);
-            return null;
-        }
+            @Override
+            protected boolean exec()
+            {
+                try
+                {
+                    Future<?> command =
+                            getBrowser()
+                                    .sendObject(new CommandSeek(time));
+                    CommandReturn<Boolean> returnOb = (CommandReturn<Boolean>) command
+                            .get();
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return false;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
+                catch (IOException | InterruptedException | ExecutionException e)
+                {
+                    this.completeExceptionally(e);
+                    return false;
+                }
+            }
+        });
     }
 
     /**
@@ -249,84 +457,49 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
      * @return A future for the request.
      */
     @Override
-    public QueryFuture<PlaybackStatus> getStatus()
+    public ForkJoinTask<PlaybackStatus> getStatus()
     {
-        try
+        return this.service.submit(new AbstractTask<>()
         {
-            Future future = getBrowser().sendObject(new QueryStatus());
-            return new QueryFuture<>()
+            @Override
+            protected boolean exec()
             {
-
-                private CommandReturn<String> getVal() throws ExecutionException, InterruptedException
+                try
                 {
-                    return ((CommandReturn<String>) future.get());
+                    Future<?> command = getBrowser()
+                            .sendObject(new QueryStatus());
+                    CommandReturn<String> returnOb =
+                            (CommandReturn<String>) command.get();
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return false;
+                    }
+                    else
+                    {
+                        this.complete(PlaybackStatus
+                                .valueOf(returnOb.getReturnValue()));
+                        return true;
+                    }
                 }
-
-                private CommandReturn<String> getVal(long timeout, TimeUnit unit) throws ExecutionException, InterruptedException, TimeoutException
+                catch (IOException | InterruptedException | ExecutionException e)
                 {
-                    return ((CommandReturn<String>) future.get(timeout, unit));
+                    this.completeExceptionally(e);
+                    return false;
                 }
-
-                @Override
-                public CommandConfirmation getConfirmation() throws CancellationException, ExecutionException, InterruptedException
-                {
-                    return this.getVal().getConfirmation();
-                }
-
-                @Override
-                public CommandConfirmation getConfirmation(long timeout, TimeUnit unit) throws ExecutionException, InterruptedException, TimeoutException
-                {
-                    return this.getVal(timeout, unit).getConfirmation();
-                }
-
-                @Override
-                public boolean cancel(boolean mayInterruptIfRunning)
-                {
-                    return future.cancel(mayInterruptIfRunning);
-                }
-
-                @Override
-                public boolean isCancelled()
-                {
-                    return future.isCancelled();
-                }
-
-                @Override
-                public boolean isDone()
-                {
-                    return future.isDone();
-                }
-
-                @Override
-                public PlaybackStatus get() throws InterruptedException, ExecutionException
-                {
-                    String value = getVal().getReturnValue();
-                    return PlaybackStatus.valueOf(value);
-                }
-
-                @Override
-                public PlaybackStatus get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
-                {
-                    String value = getVal(timeout, unit).getReturnValue();
-                    return PlaybackStatus.valueOf(value);
-                }
-            };
-        }
-        catch (IOException e)
-        {
-            logger.error("Could not send message", e);
-            return null;
-        }
+            }
+        });
     }
 
     @Override
-    public QueryFuture<Float> getCurrentTime()
+    public ForkJoinTask<Float> getCurrentTime()
     {
         return null;
     }
 
     @Override
-    public QueryFuture<Float> getLength()
+    public ForkJoinTask<Float> getLength()
     {
         return null;
     }
@@ -338,18 +511,90 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
      *                script or the background script.
      * @return The return value containing error details.
      */
-    public QueryFuture<Void> throwError(boolean forward)
+    public ForkJoinTask<Void> throwError(boolean forward)
     {
-        try
+        return this.service.submit(new AbstractTask<>()
         {
-            return new ForwardedFuture(getBrowser()
-                    .sendObject(new CommandError(forward)));
-        }
-        catch (IOException e)
+            @Override
+            protected boolean exec()
+            {
+                try
+                {
+                    Future<?> command =
+                            getBrowser()
+                                    .sendObject(new CommandError(forward));
+                    CommandReturn<Boolean> returnOb = (CommandReturn<Boolean>) command
+                            .get();
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return false;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
+                catch (IOException | InterruptedException | ExecutionException e)
+                {
+                    this.completeExceptionally(e);
+                    return false;
+                }
+            }
+        });
+    }
+
+    /**
+     * Pings the browser background.
+     *
+     * @param i - The number to send.
+     * @return A future hopefully returning the same value.
+     */
+    public ForkJoinTask<Double> ping(double i)
+    {
+        return this.ping(null, i);
+    }
+
+    /**
+     * Pings the browser foreground.
+     *
+     * @param url - The url to open.
+     * @param i   - The number to send.
+     * @return A future hopefully returning the same value.
+     */
+    public ForkJoinTask<Double> ping(URL url, double i)
+    {
+        return this.service.submit(new AbstractTask<>()
         {
-            logger.error("Could not send message", e);
-            return null;
-        }
+            @Override
+            protected boolean exec()
+            {
+                try
+                {
+                    Future<?> command = getBrowser()
+                            .sendObject(new NumberPing(url, i));
+                    CommandReturn<Number> returnOb =
+                            (CommandReturn<Number>) command.get();
+                    if (!returnOb.getConfirmation().wasSuccessful())
+                    {
+                        this.completeExceptionally(returnOb.getConfirmation()
+                                                           .getError());
+                        return false;
+                    }
+                    else
+                    {
+                        this.complete(returnOb.getReturnValue().doubleValue());
+                        return true;
+                    }
+                }
+                catch (IOException | InterruptedException | ExecutionException e)
+                {
+                    this.completeExceptionally(e);
+                    return false;
+                }
+            }
+        });
     }
 
     @Override
@@ -361,68 +606,6 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
             status = new PlaybackEvent(this, (PlaybackInfo) object);
             logger.info("Internet playback {}", status.getInfo());
             this.listeners.forEach(l -> l.onPlaybackChanged(status));
-        }
-    }
-
-    private class ForwardedFuture<T> implements QueryFuture<T>
-    {
-        private final Future<T> future;
-
-        ForwardedFuture(Future<T> future)
-        {
-            this.future = future;
-        }
-
-        private CommandReturn<T> getVal() throws ExecutionException, InterruptedException
-        {
-            return ((CommandReturn<T>) this.future.get());
-        }
-
-        private CommandReturn<T> getVal(long timeout, TimeUnit unit) throws ExecutionException, InterruptedException, TimeoutException
-        {
-            return ((CommandReturn<T>) this.future.get(timeout, unit));
-        }
-
-        @Override
-        public CommandConfirmation getConfirmation() throws CancellationException, ExecutionException, InterruptedException
-        {
-            return this.getVal().getConfirmation();
-        }
-
-        @Override
-        public CommandConfirmation getConfirmation(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
-        {
-            return this.getVal(timeout, unit).getConfirmation();
-        }
-
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning)
-        {
-            return this.future.cancel(mayInterruptIfRunning);
-        }
-
-        @Override
-        public boolean isCancelled()
-        {
-            return this.future.isCancelled();
-        }
-
-        @Override
-        public boolean isDone()
-        {
-            return this.future.isDone();
-        }
-
-        @Override
-        public T get() throws InterruptedException, ExecutionException
-        {
-            return this.getVal().getReturnValue();
-        }
-
-        @Override
-        public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException
-        {
-            return this.getVal(timeout, unit).getReturnValue();
         }
     }
 }

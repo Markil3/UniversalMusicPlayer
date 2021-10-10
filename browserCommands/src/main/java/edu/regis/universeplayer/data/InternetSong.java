@@ -10,7 +10,11 @@ import org.slf4j.LoggerFactory;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.Objects;
 
+/**
+ * An internet song is a specific type of song that is accessed from a webpage.
+ */
 public class InternetSong extends Song
 {
     private static final Logger logger = LoggerFactory
@@ -20,6 +24,30 @@ public class InternetSong extends Song
      * The location of the song.
      */
     public URL location;
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
+            return true;
+        }
+        if (!(o instanceof InternetSong that))
+        {
+            return false;
+        }
+        if (!super.equals(o))
+        {
+            return false;
+        }
+        return Objects.equals(location, that.location);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(super.hashCode(), location);
+    }
 
     @Override
     public int compareTo(Song o)

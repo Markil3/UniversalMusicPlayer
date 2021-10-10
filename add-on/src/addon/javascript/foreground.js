@@ -1,5 +1,5 @@
 let logger = new Logger("foreground");
-logger.debug("Loading foreground.js");
+console.debug("Loading foreground.js");
 let background;
 
 /**
@@ -124,7 +124,7 @@ $(function () {
     background.onMessage.addListener(message => {
         let num = message.num;
         post = data => {
-            logger.log("Sending to interface %o", data);
+            logger.trace("Sending to interface %o", data);
             background.postMessage({
                 type: "response",
                 num: num,
