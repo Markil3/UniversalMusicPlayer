@@ -244,7 +244,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
                                                 .showMessageDialog(Interface.this,
                                                         command.getException(),
                                                         command.getException()
-                                                               .getMessage(),
+                                                                .getMessage(),
                                                         JOptionPane.ERROR_MESSAGE);
                                     }
                                     return null;
@@ -461,7 +461,7 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
         this.setFocusCycleRoot(true);
 
         this.getContentPane()
-            .add(this.collectionTypes, BorderLayout.LINE_START);
+                .add(this.collectionTypes, BorderLayout.LINE_START);
         this.collectionTypes.addFocusListener(this);
         this.collectionTypes.addSongDisplayListener(this);
 
@@ -562,18 +562,24 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     @Override
     public void updateSongs(Collection<? extends Song> songs)
     {
-        this.songList.listAlbums(songs);
-        this.centerView.setViewportView(this.songList);
-        this.centerView.revalidate();
+        SwingUtilities.invokeLater(() ->
+        {
+            this.songList.listAlbums(songs);
+            this.centerView.setViewportView(this.songList);
+            this.centerView.revalidate();
+        });
     }
 
     @Override
     public void updateCollections(CollectionType type, Collection<?> collections)
     {
-        this.collectionList.listCollection(type, collections);
-        this.centerView.setViewportView(this.collectionList);
-        this.collectionList.revalidate();
-        this.centerView.revalidate();
+        SwingUtilities.invokeLater(() ->
+        {
+            this.collectionList.listCollection(type, collections);
+            this.centerView.setViewportView(this.collectionList);
+            this.collectionList.revalidate();
+            this.centerView.revalidate();
+        });
     }
 
     @Override
@@ -644,18 +650,21 @@ public class Interface extends JFrame implements SongDisplayListener, ComponentL
     public <T> void onUpdate(DataProvider<T> provider, int updated,
                              int totalUpdate, String updating)
     {
-        this.controls.setUpdateProgress(updated, totalUpdate, updating);
-        if (updated == totalUpdate || totalUpdate == 0)
+        SwingUtilities.invokeLater(() ->
         {
-            Collection<? extends Song> songs =
-                    PlayerEnvironment.getSongs().getSongs();
-            logger.debug("Resetting the song provider with {} songs.",
-                    songs.size());
-            /*
-             * TODO - Add some way to get back to the current view, just updated
-             */
-            this.updateSongs(songs);
-        }
+            this.controls.setUpdateProgress(updated, totalUpdate, updating);
+            if (updated == totalUpdate || totalUpdate == 0)
+            {
+                Collection<? extends Song> songs =
+                        PlayerEnvironment.getSongs().getSongs();
+                logger.debug("Resetting the song provider with {} songs.",
+                        songs.size());
+                /*
+                 * TODO - Add some way to get back to the current view, just updated
+                 */
+                this.updateSongs(songs);
+            }
+        });
     }
 
     @Override
