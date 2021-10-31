@@ -267,7 +267,7 @@ public class PlayerEnvironment
                     .build();
             OPTIONS.addOption(play);
             Option pause = Option.builder().longOpt("pause")
-                    .desc("Starts playback.")
+                    .desc("Pauses playback.")
                     .build();
             OPTIONS.addOption(pause);
             Option toggle = Option.builder("t").longOpt("toggle")
@@ -326,7 +326,7 @@ public class PlayerEnvironment
     {
         try
         {
-            out.println(cmd.toString());
+//            out.println(cmd.toString());
             for (Option op : cmd.getOptions())
             {
                 switch (op.getLongOpt())
@@ -476,17 +476,39 @@ public class PlayerEnvironment
                         .map(Map.Entry::getKey)
                         .collect(Collectors.toList());
                 Collections.reverse(songs);
-                out.println("Playing " + songs);
+                if (!cmd.hasOption("search"))
+                {
+                    if (songs.size() > 0)
+                    {
+                        out.print("Playing ");
+                    }
+                }
+                if (songs.size() > 0)
+                {
+                    out.print(songs.get(0));
+                    if (songs.size() > 1)
+                    {
+                        Song song;
+                        ListIterator<Song> iter = songs.listIterator(1);
+                        while (iter.hasNext())
+                        {
+                            song = iter.next();
+                            if (!cmd.hasOption("search"))
+                            {
+                                out.print("; ");
+                            }
+                            else
+                            {
+                                out.println();
+                            }
+                            out.print(song.toString());
+                        }
+                    }
+                }
+                out.println();
                 if (!cmd.hasOption("search"))
                 {
                     Queue.getInstance().addAll(songs);
-                }
-                else
-                {
-                    for (Song song : songs)
-                    {
-                        out.println(song);
-                    }
                 }
             }
         }

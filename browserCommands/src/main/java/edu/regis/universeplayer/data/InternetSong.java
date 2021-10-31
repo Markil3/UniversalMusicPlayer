@@ -73,15 +73,4 @@ public class InternetSong extends Song
         }
         return compare;
     }
-
-    @Override
-    public String toString()
-    {
-        return "Song{" +
-                "title='" + title + '\'' +
-                ", artists=" + Arrays.toString(artists) +
-                ", album=" + album +
-                ", url=" + location +
-                '}';
-    }
 }

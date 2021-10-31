@@ -99,10 +99,33 @@ public class Song implements Comparable<Song>, Serializable
     @Override
     public String toString()
     {
-        return "Song{" +
-                "title='" + title + '\'' +
-                ", artists=" + Arrays.toString(artists) +
-                ", album=" + album +
-                '}';
+        StringBuilder builder = new StringBuilder();
+        builder.append('"');
+        builder.append(this.title);
+        builder.append('"');
+        if (this.artists != null && this.artists.length > 0)
+        {
+            builder.append(" by ");
+            builder.append(this.artists[0]);
+            if (this.artists.length > 1)
+            {
+                for (int i = 1; i < this.artists.length; i++)
+                {
+                    builder.append(", ");
+                    builder.append(this.artists[i]);
+                }
+            }
+        }
+        if (this.album != null)
+        {
+            builder.append(" in ");
+            builder.append(this.album.name);
+        }
+        return builder.toString();
+//        return "Song{" +
+//                "title='" + title + '\'' +
+//                ", artists=" + Arrays.toString(artists) +
+//                ", album=" + album +
+//                '}';
     }
 }

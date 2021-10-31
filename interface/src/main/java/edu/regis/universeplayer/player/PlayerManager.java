@@ -1,18 +1,5 @@
 package edu.regis.universeplayer.player;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import javax.swing.JOptionPane;
-
 import edu.regis.universeplayer.AbstractTask;
 import edu.regis.universeplayer.PlaybackListener;
 import edu.regis.universeplayer.PlaybackStatus;
@@ -21,9 +8,15 @@ import edu.regis.universeplayer.browserCommands.QueryFuture;
 import edu.regis.universeplayer.data.InternetSong;
 import edu.regis.universeplayer.data.LocalSong;
 import edu.regis.universeplayer.data.PlaybackEvent;
-import edu.regis.universeplayer.data.Queue;
 import edu.regis.universeplayer.data.Song;
-import edu.regis.universeplayer.gui.Interface;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The PlayerManager serves as the central access point for playing songs of any

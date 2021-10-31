@@ -74,9 +74,27 @@ public class Album implements Comparable<Album>, Serializable
     @Override
     public String toString()
     {
-        return "Album{" +
-                "name='" + name + '\'' +
-                ", artists=" + Arrays.toString(artists) +
-                '}';
+        StringBuilder builder = new StringBuilder();
+        builder.append('"');
+        builder.append(this.name);
+        builder.append('"');
+        if (this.artists != null && this.artists.length > 0)
+        {
+            builder.append(" by ");
+            builder.append(this.artists[0]);
+            if (this.artists.length > 1)
+            {
+                for (int i = 1; i < this.artists.length; i++)
+                {
+                    builder.append(", ");
+                    builder.append(this.artists[i]);
+                }
+            }
+        }
+        return builder.toString();
+//        return "Album{" +
+//                "name='" + name + '\'' +
+//                ", artists=" + Arrays.toString(artists) +
+//                '}';
     }
 }
