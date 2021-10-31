@@ -31,6 +31,7 @@ dependencies {
     implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.13.3'
 
     implementation 'com.google.code.gson:gson:2.8.7'
+    implementation 'commons-cli:commons-cli:1.4'
     implementation 'net.harawata:appdirs:1.2.1'
     implementation 'org.xerial:sqlite-jdbc:3.36.0.1'
     implementation 'com.googlecode.soundlibs:jlayer:1.0.1.4'

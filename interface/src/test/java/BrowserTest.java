@@ -1,3 +1,4 @@
+import org.apache.commons.cli.CommandLine;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -28,7 +29,7 @@ public class BrowserTest
     {
         HashMap<String, Object> props = new HashMap<>();
         props.put("headless", true);
-        PlayerEnvironment.init(props, Collections.emptyList());
+        PlayerEnvironment.init(new CommandLine.Builder().build());
     }
 
     @Test

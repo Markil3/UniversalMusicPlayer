@@ -1,18 +1,15 @@
 package edu.regis.universeplayer;
 
+import org.apache.commons.cli.CommandLine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.PrintStream;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.InputMismatchException;
-import java.util.LinkedHashMap;
-import java.util.Scanner;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -43,78 +40,41 @@ public class InstanceConnector implements Runnable
             while (this.running.get())
             {
                 Socket socket = server.accept();
-                service.submit(() -> {
-                    try (Scanner scanner = new Scanner(socket.getInputStream()))
+                service.submit(() ->
+                {
+                    try
                     {
-                        String[] args = scanner.nextLine().trim().split(" ");
-                        ArrayList<String> parsedArgs = new ArrayList<>();
-                        StringBuilder cachedString = null;
-                        for (String arg : args)
+                        ObjectInputStream scanner = new ObjectInputStream(socket.getInputStream());
+                        PrintStream stream = new PrintStream(socket.getOutputStream());
+                        CommandLine cmd = (CommandLine) scanner.readObject();
+                        logger.debug("Receiving commands: " + Arrays.toString(cmd.getArgs()));
+                        if (cmd.hasOption("help"))
                         {
-                            if (cachedString != null)
-                            {
-                                if (arg.endsWith("\""))
-                                {
-                                    cachedString
-                                            .append(arg, 0, arg.length() - 1);
-                                    parsedArgs.add(cachedString.toString());
-                                    cachedString = null;
-                                }
-                                else
-                                {
-                                    cachedString.append(arg);
-                                }
-                            }
-                            if (arg.startsWith("\""))
-                            {
-                                if (arg.endsWith("\""))
-                                {
-                                    parsedArgs.add(arg.substring(1,
-                                            arg.length() - 1));
-                                }
-                                else
-                                {
-                                    cachedString =
-                                            new StringBuilder(arg.substring(1));
-                                }
-                            }
-                            else
-                            {
-                                parsedArgs.add(arg);
-                            }
+                            PlayerEnvironment.printHelp(stream);
                         }
-                        args = parsedArgs.toArray(String[]::new);
-                        LinkedHashMap<String, Object> ops = new LinkedHashMap<>();
-                        parsedArgs.clear();
-                        PlayerEnvironment.parseArgs(args, ops, parsedArgs);
-                        if (ops.containsKey("h") || ops.containsKey("help"))
+                        else
                         {
-                            PlayerEnvironment.printHelp();
-                            return;
+                            PlayerEnvironment.runArguments(cmd,
+                                    stream);
                         }
-                        PlayerEnvironment.runArguments(ops, parsedArgs,
-                                new PrintStream(socket.getOutputStream()));
-                        socket.shutdownOutput();
                         /*
                          * Wait for the client to acknowledge the print
                          * before closing the stream.
                          */
-                        while (true)
-                        {
-                            try
-                            {
-                                scanner.nextInt();
-                                break;
-                            }
-                            catch (InputMismatchException e)
-                            {
-                            }
-                        }
+                        stream.println();
+                        stream.println("END");
+                        scanner.readInt();
                         logger.debug("Finished request");
                     }
-                    catch (IOException e)
+                    catch (EOFException e)
                     {
-                        logger.error("Error reading socket stream");
+                        /*
+                         * Doesn't really matter
+                         */
+                    }
+                    catch (IOException | ClassNotFoundException e)
+                    {
+                        logger.error("Error reading socket stream", e);
                     }
                     finally
                     {

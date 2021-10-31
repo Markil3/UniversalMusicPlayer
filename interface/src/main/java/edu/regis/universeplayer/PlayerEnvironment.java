@@ -1,22 +1,12 @@
 package edu.regis.universeplayer;
 
+import org.apache.commons.cli.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintStream;
+import java.io.*;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.ResourceBundle;
-import java.util.Scanner;
-import java.util.concurrent.ExecutionException;
+import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.regex.Pattern;
@@ -24,7 +14,6 @@ import java.util.stream.Collectors;
 
 import javax.swing.JOptionPane;
 
-import edu.regis.universeplayer.browserCommands.QueryFuture;
 import edu.regis.universeplayer.data.AlbumProvider;
 import edu.regis.universeplayer.data.CompiledSongProvider;
 import edu.regis.universeplayer.data.DefaultAlbumProvider;
@@ -49,6 +38,8 @@ public class PlayerEnvironment
     private static final ResourceBundle langs = ResourceBundle
             .getBundle("lang.interface", Locale.getDefault());
 
+    private static Options OPTIONS;
+
     private static AlbumProvider ALBUMS_INSTANCE;
     private static SongProvider<?> SONGS_INSTANCE;
 
@@ -67,19 +58,35 @@ public class PlayerEnvironment
      */
     public static void main(String[] args)
     {
-        LinkedHashMap<String, Object> ops = new LinkedHashMap<>();
-        ArrayList<String> params = new ArrayList<>();
-        parseArgs(args, ops, params);
+        Options ops = setupCLIArgs();
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd = null;//not a good practice, it serves it purpose
 
-        if (ops.containsKey("h") || ops.containsKey("help"))
+        try
         {
+            cmd = parser.parse(ops, args);
+        }
+        catch (ParseException e)
+        {
+            System.err.println(e.getMessage());
             printHelp();
-            return;
+
+            System.exit(1);
         }
 
-        if (!connectToServer(args))
+        if (cmd.hasOption("help"))
         {
-            init(ops, params);
+            printHelp();
+            System.exit(0);
+        }
+
+        /*
+         * Attempts to forward the args to the running instance, or start a new
+         * instance if there is no instance running.
+         */
+        if (!connectToServer(cmd))
+        {
+            init(cmd);
         }
     }
 
@@ -89,57 +96,47 @@ public class PlayerEnvironment
      * @param args - The argument list to forward.
      * @return True if the server exists, false if not.
      */
-    private static boolean connectToServer(String[] args)
+    private static boolean connectToServer(CommandLine args)
     {
+        String data;
         Socket socket;
+        boolean success = false;
         try
         {
             socket = new Socket("localhost", ConfigManager.PORT);
-            try (PrintStream out = new PrintStream(socket.getOutputStream()))
+            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+            Scanner in = new Scanner(socket.getInputStream());
+            logger.debug("Connecting to remote");
+            out.writeObject(args);
+            logger.debug("Waiting for output");
+            while (in.hasNextLine())
             {
-                boolean quote;
-                for (String arg : args)
+                data = in.nextLine();
+                if (data.equals("END"))
                 {
-                    quote = arg.contains(" ");
-                    if (quote)
-                    {
-                        out.print('"');
-                    }
-                    out.print(arg);
-                    if (quote)
-                    {
-                        out.print('"');
-                    }
-                    out.print(' ');
+                    break;
                 }
-                out.println();
-                try (Scanner in = new Scanner(socket.getInputStream()))
-                {
-                    while (in.hasNextLine())
-                    {
-                        System.out.println(in.nextLine());
-                    }
-                }
-                out.print(1);
+                System.out.println(data);
             }
-            return true;
+            success = true;
+            logger.debug("Finished reading return output.");
+            out.writeInt(-1);
         }
         catch (IOException e)
         {
             logger.debug("Couldn't connect to server", e);
-            return false;
         }
+        return success;
     }
 
-    public static void init(Map<String, Object> ops,
-                             List<String> params)
+    public static void init(CommandLine cmd)
     {
         /*
          * Add this just in case of a crash or something. It won't work if the
          * program is forcibly terminated by the OS, but it could be helpful
          * otherwise.
          */
-        logger.info("Starting application {} {}", params, ops);
+        logger.info("Starting application {}", cmd);
 
         InstanceConnector connector = new InstanceConnector();
         new Thread(connector).start();
@@ -151,9 +148,10 @@ public class PlayerEnvironment
 
         Queue queue = Queue.getInstance();
         PlayerManager playback = PlayerManager.getPlayers();
-        queue.addSongChangeListener(queue1 -> ForkJoinPool.commonPool().submit(() -> {
+        queue.addSongChangeListener(queue1 -> ForkJoinPool.commonPool().submit(() ->
+        {
             ForkJoinTask<Void> command = PlayerManager.getPlayers()
-                                                      .stopSong();
+                    .stopSong();
             if (command != null)
             {
                 command.join();
@@ -192,7 +190,8 @@ public class PlayerEnvironment
                 }
             }
         }));
-        playback.addPlaybackListener(status -> {
+        playback.addPlaybackListener(status ->
+        {
             logger.info("Receiving {} from {}", status.getInfo(), status
                     .getSource());
             if (status.getInfo().getStatus() == PlaybackStatus.FINISHED)
@@ -201,7 +200,7 @@ public class PlayerEnvironment
             }
         });
 
-        if (!ops.containsKey("headless"))
+        if (!cmd.hasOption("headless"))
         {
             Interface inter = new Interface();
             inter.setSize(700, 500);
@@ -212,109 +211,103 @@ public class PlayerEnvironment
         /*
          * Open up the relevant songs
          */
-        runArguments(ops, params, System.out);
+        runArguments(cmd, System.out);
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+        Runtime.getRuntime().addShutdownHook(new Thread(() ->
+        {
             connector.stop();
             PlayerManager.getPlayers().shutdownPlayers();
         }));
     }
 
-    /**
-     * Converts an array of string arguments into a map of options and extra
-     * parameters.
-     *
-     * @param args    - The arguments to parse.
-     * @param options - The map to dump the options into.
-     * @param params  - The list to dump the other parameters into.
-     */
-    public static void parseArgs(String[] args,
-                                 Map<String, Object> options,
-                                 List<String> params)
+    private static Options setupCLIArgs()
     {
-        int equals;
-        Object value;
-        String key;
-        String valStr;
-        int i, j, l, l2;
-        for (i = 0, l = args.length; i < l; i++)
+        if (OPTIONS == null)
         {
-            valStr = null;
-            if (args[i].startsWith("-"))
-            {
-                if (args[i].startsWith("--"))
-                {
-                    equals = args[i].indexOf('=');
-                    if (equals != -1)
-                    {
-                        valStr = args[i].substring(equals + 1);
-                    }
-                    else
-                    {
-                        equals = args[i].length();
-                    }
-                    key = args[i].substring(2, equals);
-                }
-                else
-                {
-                    for (j = 1, l2 = args[i].length() - 1; j < l2; j++)
-                    {
-                        options.put(args[i].substring(j, j + 1), null);
-                    }
-                    key = args[i].substring(j, j + 1);
-                }
-                if (valStr == null && i < args.length - 1 && !args[i + 1]
-                        .startsWith("-"))
-                {
-                    valStr = args[++i];
-                }
-                if (valStr != null)
-                {
-                    if (Pattern.matches("\\d+", valStr))
-                    {
-                        value = Integer.parseInt(valStr);
-                    }
-                    else if (Pattern.matches("\\d*\\.\\d+", valStr))
-                    {
-                        value = Double.parseDouble(valStr);
-                    }
-                    else
-                    {
-                        value = valStr;
-                    }
-                }
-                else
-                {
-                    value = true;
-                }
-                options.put(key, value);
-            }
-            else
-            {
-                params.add(args[i]);
-            }
+            OPTIONS = new Options();
+            /*
+             * Launch options
+             */
+            Option headless = Option.builder().longOpt("headless")
+                    .desc("Runs the player without a GUI.")
+                    .build();
+            OPTIONS.addOption(headless);
+            Option help = Option.builder("h").longOpt("help")
+                    .desc("Prints this help message.")
+                    .build();
+            OPTIONS.addOption(help);
+
+            /*
+             * Playback options
+             */
+            Option play = Option.builder().longOpt("play")
+                    .desc("Starts playback.")
+                    .build();
+            OPTIONS.addOption(play);
+            Option pause = Option.builder().longOpt("pause")
+                    .desc("Starts playback.")
+                    .build();
+            OPTIONS.addOption(pause);
+            Option toggle = Option.builder("t").longOpt("toggle")
+                    .desc("Toggles playback.")
+                    .build();
+            OPTIONS.addOption(toggle);
+            Option seek = Option.builder().longOpt("seek")
+                    .hasArg().argName("time").desc("Seeks the player to the provided time, in seconds.")
+                    .build();
+            OPTIONS.addOption(seek);
+            Option clear = Option.builder("c").longOpt("clear")
+                    .desc("Clears the queue before adding songs.")
+                    .build();
+            OPTIONS.addOption(clear);
+            Option next = Option.builder("n").longOpt("next")
+                    .hasArg().optionalArg(true).argName("skipBy")
+                    .desc("Skips to the next song by skipBy songs. Defaults to 1.")
+                    .build();
+            OPTIONS.addOption(next);
+            Option prev = Option.builder("p").longOpt("prev")
+                    .hasArg().optionalArg(true).argName("skipBy")
+                    .desc("Skips to the previous song by skipBy songs. Defaults to 1.")
+                    .build();
+            OPTIONS.addOption(prev);
+            Option skip = Option.builder().longOpt("skip")
+                    .hasArg().optionalArg(true).argName("skipTo")
+                    .desc("Skips to the requested song in the queue. Defaults to the next song.")
+                    .build();
+            OPTIONS.addOption(skip);
+            Option status = Option.builder().longOpt("status")
+                    .desc("Obtains the playback status.")
+                    .build();
+            OPTIONS.addOption(status);
+            Option queue = Option.builder().longOpt("queue")
+                    .desc("Gets the queue.")
+                    .build();
+            OPTIONS.addOption(queue);
+
+            Option search = Option.builder().longOpt("search")
+                    .desc("Searches the library for songs matching the arguments, instead of enqueuing them.")
+                    .build();
+            OPTIONS.addOption(search);
         }
+        return OPTIONS;
     }
 
     /**
      * Runs command-line arguments
      *
-     * @param options - Run options
-     * @param params  - A list of song terms to search for and enqueue.
-     * @param out     - Program output. While this may simply be System .out,
-     *                this is just as likely going to be outputting to another
-     *                program instance.
+     * @param cmd - A list of song terms to search for and enqueue.
+     * @param out - Program output. While this may simply be System .out, this
+     *            is just as likely going to be outputting to another program
+     *            instance.
      */
-    public static void runArguments(Map<String, Object> options,
-                                    List<String> params, PrintStream out)
+    public static void runArguments(CommandLine cmd, PrintStream out)
     {
         try
         {
-            out.println(options.toString());
-            out.println(params.toString());
-            for (String op : options.keySet())
+            out.println(cmd.toString());
+            for (Option op : cmd.getOptions())
             {
-                switch (op)
+                switch (op.getLongOpt())
                 {
                 case "play" -> {
                     PlayerManager.getPlayers().play();
@@ -330,23 +323,15 @@ public class PlayerEnvironment
                 }
                 case "seek" -> {
                     PlayerManager.getPlayers()
-                                 .seek((int) options.get("seek"));
+                            .seek(Float.parseFloat(op.getValue()));
                     out.println("Seeking");
                 }
-                case "clear", "c" -> {
+                case "clear" -> {
                     out.println("Clearing");
                     Queue.getInstance().clear();
                 }
-                case "next", "n" -> {
-                    Integer number = null;
-                    if (options.get("next") instanceof Integer)
-                    {
-                        number = (Integer) options.get("next");
-                    }
-                    else if (options.get("n") instanceof Integer)
-                    {
-                        number = (Integer) options.get("n");
-                    }
+                case "next" -> {
+                    String number = op.getValue();
                     if (number == null)
                     {
                         Queue.getInstance().skipNext();
@@ -354,20 +339,12 @@ public class PlayerEnvironment
                     else
                     {
                         Queue.getInstance().skipToSong(Queue.getInstance()
-                                                            .getCurrentIndex() + number);
+                                .getCurrentIndex() + Integer.parseInt(number));
                     }
                     out.println("Next Song");
                 }
-                case "prev", "p" -> {
-                    Integer number = null;
-                    if (options.get("prev") instanceof Integer)
-                    {
-                        number = (Integer) options.get("prev");
-                    }
-                    else if (options.get("p") instanceof Integer)
-                    {
-                        number = (Integer) options.get("p");
-                    }
+                case "prev" -> {
+                    String number = op.getValue();
                     if (number == null)
                     {
                         Queue.getInstance().skipNext();
@@ -375,25 +352,21 @@ public class PlayerEnvironment
                     else
                     {
                         Queue.getInstance().skipToSong(Queue.getInstance()
-                                                            .getCurrentIndex() - number);
+                                .getCurrentIndex() - Integer.parseInt(number));
                     }
-                    out.println("Clearing");
+                    out.println("Previous Song");
                 }
                 case "skip" -> {
-                    Integer number = null;
-                    if (options.get("skip") instanceof Integer)
-                    {
-                        number = (Integer) options.get("skip");
-                    }
+                    String number = op.getValue();
                     if (number == null)
                     {
                         Queue.getInstance().skipNext();
                     }
                     else
                     {
-                        Queue.getInstance().skipToSong(number);
+                        Queue.getInstance().skipToSong(Integer.parseInt(number));
                     }
-                    out.println("Clearing");
+                    out.println("Skipping to song");
                 }
                 case "status" -> {
                     ForkJoinTask<PlaybackStatus> status =
@@ -423,17 +396,18 @@ public class PlayerEnvironment
                 }
             }
             HashMap<Song, Integer> matchMap = new HashMap<>();
-            for (String param : params)
+            for (String param : cmd.getArgList())
             {
                 String finalParam = param.toLowerCase();
-                getSongs().getSongs().forEach(song -> {
+                getSongs().getSongs().forEach(song ->
+                {
                     Integer matches = matchMap.get(song);
                     if (matches == null)
                     {
                         matches = 0;
                     }
                     if (song.title != null && song.title.toLowerCase()
-                                                        .contains(finalParam))
+                            .contains(finalParam))
                     {
                         matches++;
                     }
@@ -475,13 +449,23 @@ public class PlayerEnvironment
             if (matchMap.size() > 0)
             {
                 List<Song> songs = matchMap.entrySet().stream().sorted(Map.Entry
-                        .comparingByValue()).filter(entry -> (entry
-                        .getValue() / (float) params.size()) >= 0.65F)
-                                           .map(Map.Entry::getKey)
-                                           .collect(Collectors.toList());
+                                .comparingByValue()).filter(entry -> (entry
+                                .getValue() / (float) cmd.getArgList().size()) >= 0.65F)
+                        .map(Map.Entry::getKey)
+                        .collect(Collectors.toList());
                 Collections.reverse(songs);
                 out.println("Playing " + songs);
-                Queue.getInstance().addAll(songs);
+                if (!cmd.hasOption("search"))
+                {
+                    Queue.getInstance().addAll(songs);
+                }
+                else
+                {
+                    for (Song song : songs)
+                    {
+                        out.println(song);
+                    }
+                }
             }
         }
         catch (Throwable e)
@@ -490,40 +474,24 @@ public class PlayerEnvironment
         }
     }
 
+    /**
+     * Prints command line arguments to the error console.
+     */
     public static void printHelp()
     {
-        System.out.println("Universal Music Player");
-        System.out.println("----------------------");
-        System.out.println("CLI Arguments");
-        System.out.println("\t--headless");
-        System.out.println("\t\tRuns the player without a GUI.");
-        System.out.println("\t--play");
-        System.out.println("\t\tStarts playback");
-        System.out.println("\t--pause");
-        System.out.println("\t\tPauses playback");
-        System.out.println("\t--toggle, -t");
-        System.out.println("\t\tToggles playback");
-        System.out.println("\t--seek <time>");
-        System.out.println("\t\tSeeks the player to the provided time, in " +
-                "seconds");
-        System.out.println("\t--clear, -c");
-        System.out.println("\t\tClears the queue before adding songs");
-        System.out.println("\t--next, -n [skipBy]");
-        System.out.println("\t\tSkips to the next song by skipBy songs. " +
-                "Defaults to 1.");
-        System.out.println("\t--prev, -p [skipBy]");
-        System.out.println("\t\tSkips to the previous song by skipBy songs. " +
-                "Defaults to 1.");
-        System.out.println("\t--skip [skipTo]");
-        System.out.println("\t\tSkips to the requested song in the queue. " +
-                "Defaults to the next song.");
-        System.out.println("\t--status");
-        System.out.println("\t\tObtains the playback status");
-        System.out.println("\t--song");
-        System.out.println("\t\tObtains the current song");
-        System.out.println("\t--queue");
-        System.out.println("\t\tGets the queue");
-        System.out.println("\t--help, -h");
-        System.out.println("\t\tPrints this help message");
+        printHelp(System.err);
+    }
+
+    /**
+     * Prints command line arguments to the provided print stream.
+     *
+     * @param stream - The stream to print the options to.
+     */
+    public static void printHelp(PrintStream stream)
+    {
+        final HelpFormatter formatter = new HelpFormatter();
+        PrintWriter writer = new PrintWriter(stream);
+        formatter.printHelp(formatter.getWidth(), "utility-name", "CLI Arguments", setupCLIArgs(), null);
+        writer.flush();
     }
 }
