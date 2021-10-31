@@ -131,23 +131,33 @@ public class PlayerEnvironment
 
     public static void init(CommandLine cmd)
     {
-        /*
-         * Add this just in case of a crash or something. It won't work if the
-         * program is forcibly terminated by the OS, but it could be helpful
-         * otherwise.
-         */
         logger.info("Starting application {}", cmd);
 
+        /*
+         * Create a new thread to handle new instances of the player.
+         */
         InstanceConnector connector = new InstanceConnector();
-        new Thread(connector).start();
+        new Thread(connector, "InstanceConnector").start();
 
+        /*
+         * Initialize the song and album collections. Both of these will
+         * automatically populate themselves upon construction on separate
+         * threads.
+         */
         ALBUMS_INSTANCE = new DefaultAlbumProvider();
         SONGS_INSTANCE =
                 new CompiledSongProvider(new LocalSongProvider(ALBUMS_INSTANCE),
                         new InternetSongProvider(ALBUMS_INSTANCE));
 
+        /*
+         * Initializes the song queue and the various players used.
+         */
         Queue queue = Queue.getInstance();
         PlayerManager playback = PlayerManager.getPlayers();
+        /*
+         * Every time the queue triggers a change, this callback will tell the
+         * player manager to play the next one.
+         */
         queue.addSongChangeListener(queue1 -> ForkJoinPool.commonPool().submit(() ->
         {
             ForkJoinTask<Void> command = PlayerManager.getPlayers()
@@ -190,6 +200,11 @@ public class PlayerEnvironment
                 }
             }
         }));
+        /*
+         * Whenever the playback manager finishes a song, this callback will
+         * tell the queue to skip to the next song. This triggers the above
+         * callback.
+         */
         playback.addPlaybackListener(status ->
         {
             logger.info("Receiving {} from {}", status.getInfo(), status
@@ -200,6 +215,9 @@ public class PlayerEnvironment
             }
         });
 
+        /*
+         * Show the GUI, if necessary.
+         */
         if (!cmd.hasOption("headless"))
         {
             Interface inter = new Interface();
@@ -213,6 +231,10 @@ public class PlayerEnvironment
          */
         runArguments(cmd, System.out);
 
+        /*
+         * Stops the interface connector and shut down players as needed when we
+         * close the program.
+         */
         Runtime.getRuntime().addShutdownHook(new Thread(() ->
         {
             connector.stop();

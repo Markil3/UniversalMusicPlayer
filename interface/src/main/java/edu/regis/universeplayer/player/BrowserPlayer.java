@@ -94,7 +94,7 @@ public class BrowserPlayer implements Player<InternetSong>, UpdateListener
                 this.error = true;
                 Browser.notifyAllInstance();
             }
-        });
+        }, "BrowserThread");
         browserThread.start();
     }
 

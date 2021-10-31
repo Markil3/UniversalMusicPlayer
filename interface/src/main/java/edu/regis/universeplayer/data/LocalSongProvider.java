@@ -398,6 +398,7 @@ public class LocalSongProvider extends DatabaseProvider<LocalSong> implements So
 
         public FolderCounter(Path source, Path[] exclude, Path[] include)
         {
+            super();
             this.source = source;
             this.exclude = exclude;
             this.include = include;
