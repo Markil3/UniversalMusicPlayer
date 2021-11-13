@@ -5,6 +5,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -67,9 +68,9 @@ public class PingTest
         System.out.println("Numbered pings sent");
         for (int i = 0; i < futures.size(); i++)
         {
-            assertEquals(i,
-                    ((CommandReturn<Double>) futures.get(i).get())
-                            .getReturnValue(), 0.001);
+            assertEquals(new BigDecimal(i),
+                    ((CommandReturn<BigDecimal>) futures.get(i).get())
+                            .getReturnValue());
         }
         System.out.println("Objects received");
     }
