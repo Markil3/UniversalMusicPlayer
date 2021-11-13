@@ -9,14 +9,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.io.PrintStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -95,23 +93,62 @@ public class PlayerEnvironment
         String data;
         Socket socket;
         boolean success = false;
+        AtomicBoolean streamRunning = new AtomicBoolean(true);
+        Thread inputRunner;
         try
         {
             socket = new Socket("localhost", ConfigManager.PORT);
             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-            Scanner in = new Scanner(socket.getInputStream());
+            Scanner remoteOut = new Scanner(socket.getInputStream());
             logger.debug("Connecting to remote");
             out.writeObject(args);
+            /*
+             * Start a stream for
+             */
+            inputRunner = new Thread(() -> {
+                Scanner sysIn = new Scanner(System.in);
+                String line;
+                while (streamRunning.get())
+                {
+                    if (sysIn.hasNextLine())
+                    {
+                        line = sysIn.nextLine();
+                        try
+                        {
+                            out.writeInt(5);
+                            out.writeObject(line);
+                        }
+                        catch (IOException e)
+                        {
+                            logger.error("Could not write console input to remote instance", e);
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            Thread.sleep(100);
+                        }
+                        catch (InterruptedException e)
+                        {
+                            logger.error("Error in input runner while sleeping", e);
+                        }
+                    }
+                }
+                sysIn.close();
+            }, "InputRunner");
+            inputRunner.start();
             logger.debug("Waiting for output");
-            while (in.hasNextLine())
+            while (remoteOut.hasNextLine())
             {
-                data = in.nextLine();
+                data = remoteOut.nextLine();
                 if (data.equals("END"))
                 {
                     break;
                 }
                 System.out.println(data);
             }
+            streamRunning.set(false);
             success = true;
             logger.debug("Finished reading return output.");
             out.writeInt(-1);
@@ -223,7 +260,7 @@ public class PlayerEnvironment
         /*
          * Open up the relevant songs
          */
-        runArguments(cmd, System.out);
+        runArguments(cmd, System.out, System.in);
 
         /*
          * Stops the interface connector and shut down players as needed when we
@@ -304,6 +341,52 @@ public class PlayerEnvironment
                     .desc("Searches the library for songs matching the arguments, instead of enqueuing them.")
                     .build();
             OPTIONS.addOption(search);
+
+            Option addAlbum = Option.builder().longOpt("addAlbum")
+                    .hasArg().optionalArg(true).argName("name")
+                    .desc("Adds an album to the library")
+                    .build();
+            OPTIONS.addOption(addAlbum);
+            Option addRemote = Option.builder().longOpt("add")
+                    .numberOfArgs(6).argName("url title artist1;artist2 track disc albumName")
+                    .desc("Adds an internet song to the library.")
+                    .build();
+            OPTIONS.addOption(addRemote);
+            Option name = Option.builder().longOpt("name")
+                    .hasArg().argName("title")
+                    .desc("Used for searching and adding elements to specify the name of what song you want to find/add.")
+                    .build();
+            OPTIONS.addOption(name);
+            Option artists = Option.builder("a").longOpt("artist")
+                    .hasArg().argName("artist1;artist2")
+                    .desc("A semicolon-separated list used for searching and adding elements to specify artists to find/add to your element.")
+                    .build();
+            OPTIONS.addOption(artists);
+            Option year = Option.builder("y").longOpt("year")
+                    .hasArg().argName("year")
+                    .desc("Used for searching and adding elements to specify the year of the album to find/add.")
+                    .build();
+            OPTIONS.addOption(year);
+            Option genres = Option.builder("g").longOpt("genre")
+                    .hasArg().argName("genre1;genre2")
+                    .desc("A semicolon-separated list used for searching and adding elements to specify genres to find/add to your album.")
+                    .build();
+            OPTIONS.addOption(genres);
+            Option albumName = Option.builder("b").longOpt("album")
+                    .hasArg().argName("name")
+                    .desc("Used for searching and adding songs to specify the name of the album to find/add to.")
+                    .build();
+            OPTIONS.addOption(albumName);
+            Option track = Option.builder().longOpt("track")
+                    .hasArg().argName("trackNum")
+                    .desc("Used for searching and adding elements to specify the track number of the song or the number of tracks in the album, depending on the context.")
+                    .build();
+            OPTIONS.addOption(track);
+            Option disc = Option.builder("d").longOpt("disc")
+                    .hasArg().argName("discNum")
+                    .desc("Used for searching and adding elements to specify the disc the song is on or the number of discs in the album, depending on the context.")
+                    .build();
+            OPTIONS.addOption(disc);
         }
         return OPTIONS;
     }
@@ -316,7 +399,7 @@ public class PlayerEnvironment
      *            is just as likely going to be outputting to another program
      *            instance.
      */
-    public static void runArguments(CommandLine cmd, PrintStream out)
+    public static void runArguments(CommandLine cmd, PrintStream out, InputStream in)
     {
         try
         {
@@ -408,6 +491,118 @@ public class PlayerEnvironment
                         out.print(" ");
                         out.println(song.toString());
                     }
+                }
+                case "addAlbum" -> {
+                    String albumName = op.getValue();
+                    String[] artists = null;
+                    String[] genres = null;
+                    int year = -1;
+                    int tracks = -1;
+                    int discs = -1;
+                    if (albumName == null)
+                    {
+                        if (cmd.hasOption("name"))
+                        {
+                            albumName = cmd.getOptionValue("name");
+                        }
+                        if (albumName == null)
+                        {
+                            if (cmd.hasOption("album"))
+                            {
+                                albumName = cmd.getOptionValue("album");
+                            }
+                        }
+                    }
+                    if (cmd.hasOption("artist") && cmd.getOptionValue("artist") != null)
+                    {
+                        artists = cmd.getOptionValue("artist").split("\\s*;\\s*");
+                    }
+                    if (cmd.hasOption("genre") && cmd.getOptionValue("genre") != null)
+                    {
+                        genres = cmd.getOptionValue("genre").split("\\s*;\\s*");
+                    }
+                    if (cmd.hasOption("year") && cmd.getOptionValue("year") != null)
+                    {
+                        year = Integer.parseInt(cmd.getOptionValue("year"));
+                    }
+                    if (cmd.hasOption("track") && cmd.getOptionValue("track") != null)
+                    {
+                        tracks = Integer.parseInt(cmd.getOptionValue("track"));
+                    }
+                    if (cmd.hasOption("disc") && cmd.getOptionValue("disc") != null)
+                    {
+                        discs = Integer.parseInt(cmd.getOptionValue("disc"));
+                    }
+
+                    /*
+                     * Prompt the user for missing information
+                     */
+                    try (Scanner scanner = new Scanner(in))
+                    {
+                        if (albumName == null)
+                        {
+                            out.println("What is the name of the album: ");
+                            albumName = scanner.nextLine();
+                        }
+                        if (artists == null)
+                        {
+                            out.println("Please enter the album artists as a semicolon-separated list: ");
+                            artists = scanner.nextLine().split("\\s*;\\s*");
+                        }
+                        if (genres == null)
+                        {
+                            out.println("Please enter the genres as a semicolon-separated list: ");
+                            genres = scanner.nextLine().split("\\s*;\\s*");
+                        }
+                        while (year == -1)
+                        {
+                            out.println("Please enter the album year: ");
+                            try
+                            {
+                                year = Integer.parseInt(scanner.nextLine());
+                            }
+                            catch (NumberFormatException e)
+                            {
+                                out.println("Invalid number entered.");
+                            }
+                        }
+                        while (tracks == -1)
+                        {
+                            out.println("Please enter the number of tracks on the album: ");
+                            try
+                            {
+                                tracks = Integer.parseInt(scanner.nextLine());
+                            }
+                            catch (NumberFormatException e)
+                            {
+                                out.println("Invalid number entered.");
+                            }
+                        }
+                        while (discs == -1)
+                        {
+                            out.println("Please enter the number of discs on the album: ");
+                            try
+                            {
+                                discs = Integer.parseInt(scanner.nextLine());
+                            }
+                            catch (NumberFormatException e)
+                            {
+                                out.println("Invalid number entered.");
+                            }
+                        }
+                    }
+
+                    Album album = new Album();
+                    album.name = albumName;
+                    album.artists = artists;
+                    album.genres = genres;
+                    album.year = year;
+                    album.totalTracks = tracks;
+                    album.totalDiscs = discs;
+                    out.println(album.toString());
+                }
+                case "add" -> {
+
                 }
                 }
             }

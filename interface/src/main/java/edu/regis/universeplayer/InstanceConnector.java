@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * This runner is used to handle other instances of the program wanting to
@@ -46,7 +47,48 @@ public class InstanceConnector implements Runnable
                     {
                         ObjectInputStream scanner = new ObjectInputStream(socket.getInputStream());
                         PrintStream stream = new PrintStream(socket.getOutputStream());
+                        PipedOutputStream consoleInProxy = new PipedOutputStream();
+                        PipedInputStream consoleInput = new PipedInputStream(consoleInProxy);
+                        AtomicBoolean consoleRunning = new AtomicBoolean(true);
+                        AtomicInteger consoleCode = new AtomicInteger(0);
+
+                        Thread consoleRunner = new Thread(() ->
+                        {
+                            try (PrintStream consoleStream = new PrintStream(consoleInProxy))
+                            {
+                                synchronized (consoleCode)
+                                {
+                                    while (consoleRunning.get())
+                                    {
+                                        consoleCode.set(scanner.readInt());
+                                        consoleCode.notifyAll();
+                                        if (consoleCode.get() == 5)
+                                        {
+                                            consoleStream.println((String) scanner.readObject());
+                                        }
+                                        else if (consoleCode.get() == -1)
+                                        {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            catch (IOException | ClassNotFoundException e)
+                            {
+                                if (!(e instanceof EOFException))
+                                {
+                                    logger.error("Error reading remote console input", e);
+                                }
+                                synchronized (consoleCode)
+                                {
+                                    consoleCode.set(-1);
+                                    consoleCode.notifyAll();
+                                }
+                            }
+                        }, "ConsoleRunner");
+
                         CommandLine cmd = (CommandLine) scanner.readObject();
+                        consoleRunner.start();
                         logger.debug("Receiving commands: " + Arrays.toString(cmd.getArgs()));
                         if (cmd.hasOption("help"))
                         {
@@ -55,7 +97,7 @@ public class InstanceConnector implements Runnable
                         else
                         {
                             PlayerEnvironment.runArguments(cmd,
-                                    stream);
+                                    stream, consoleInput);
                         }
                         /*
                          * Wait for the client to acknowledge the print
@@ -63,7 +105,20 @@ public class InstanceConnector implements Runnable
                          */
                         stream.println();
                         stream.println("END");
-                        scanner.readInt();
+                        synchronized (consoleCode)
+                        {
+                            while (consoleCode.get() != -1)
+                            {
+                                try
+                                {
+                                    consoleCode.wait();
+                                }
+                                catch (InterruptedException e)
+                                {
+                                    logger.error("Interrupted while waiting for remote to confirm exit", e);
+                                }
+                            }
+                        }
                         logger.debug("Finished request");
                     }
                     catch (EOFException e)
