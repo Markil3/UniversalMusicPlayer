@@ -1,29 +1,23 @@
 package edu.regis.universeplayer;
 
+import edu.regis.universeplayer.data.Queue;
+import edu.regis.universeplayer.data.*;
+import edu.regis.universeplayer.gui.Interface;
+import edu.regis.universeplayer.player.PlayerManager;
 import org.apache.commons.cli.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import javax.swing.*;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import javax.swing.JOptionPane;
-
-import edu.regis.universeplayer.data.AlbumProvider;
-import edu.regis.universeplayer.data.CompiledSongProvider;
-import edu.regis.universeplayer.data.DefaultAlbumProvider;
-import edu.regis.universeplayer.data.InternetSongProvider;
-import edu.regis.universeplayer.data.LocalSongProvider;
-import edu.regis.universeplayer.data.Queue;
-import edu.regis.universeplayer.data.Song;
-import edu.regis.universeplayer.data.SongProvider;
-import edu.regis.universeplayer.gui.Interface;
-import edu.regis.universeplayer.player.PlayerManager;
 
 /**
  * A centralized spot to link up all of the components.

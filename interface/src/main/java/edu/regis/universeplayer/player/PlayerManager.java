@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.TimeUnit;
 
@@ -252,30 +253,53 @@ public class PlayerManager implements PlaybackListener
         };
     }
 
+    /**
+     * Loads up a requested song and immedietally begins playback.
+     *
+     * @param song - The song to load.
+     * @return The task that handles the request.
+     */
     public ForkJoinTask<Void> playSong(Song song)
     {
-        if (this.currentSong != null)
+        return ForkJoinPool.commonPool().submit(new AbstractTask<Void>()
         {
-            this.currentPlayer.stopSong();
-        }
-        this.currentSong = null;
-        this.currentPlayer = this.getCompatiblePlayer(song);
-        if (this.currentPlayer == null)
-        {
-            throw new IllegalArgumentException("Unknown song type " + song
-                    .getClass());
-        }
-        this.currentSong = song;
-        return this.currentPlayer.loadSong(song);
+            @Override
+            protected boolean exec()
+            {
+                if (currentSong != null)
+                {
+                    currentPlayer.stopSong().join();
+                }
+                currentSong = null;
+                currentPlayer = getCompatiblePlayer(song);
+                if (currentPlayer == null)
+                {
+                    throw new IllegalArgumentException("Unknown song type " + song
+                            .getClass());
+                }
+                currentSong = song;
+                currentPlayer.loadSong(song).join();
+                return true;
+            }
+        });
     }
 
+    /**
+     * Obtains the playback status of the current player.
+     *
+     * @return A task containing the status, or EMPTY if no player is being
+     * used.
+     */
     public ForkJoinTask<PlaybackStatus> getStatus()
     {
         if (this.currentPlayer != null)
         {
             return this.currentPlayer.getStatus();
         }
-        return new AbstractTask<>()
+        /*
+         * If we have no player, then we return EMPTY.
+         */
+        return ForkJoinPool.commonPool().submit(new AbstractTask<>()
         {
             @Override
             protected boolean exec()
@@ -283,16 +307,29 @@ public class PlayerManager implements PlaybackListener
                 complete(PlaybackStatus.EMPTY);
                 return true;
             }
-        };
+        });
     }
 
+    /**
+     * Seeks to the specified time stamp.
+     *
+     * @param time - The time to seek to, in seconds.
+     * @return The task running this task.
+     */
     public ForkJoinTask<Void> seek(float time)
     {
         if (this.currentPlayer != null)
         {
             return this.currentPlayer.seek(time);
         }
-        return null;
+        return ForkJoinPool.commonPool().submit(new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                return true;
+            }
+        });
     }
 
     public ForkJoinTask<Void> play()
@@ -301,7 +338,14 @@ public class PlayerManager implements PlaybackListener
         {
             return this.currentPlayer.play();
         }
-        return null;
+        return ForkJoinPool.commonPool().submit(new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                return true;
+            }
+        });
     }
 
     public ForkJoinTask<Void> pause()
@@ -310,7 +354,14 @@ public class PlayerManager implements PlaybackListener
         {
             return this.currentPlayer.pause();
         }
-        return null;
+        return ForkJoinPool.commonPool().submit(new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                return true;
+            }
+        });
     }
 
     public ForkJoinTask<Void> toggle()
@@ -319,7 +370,14 @@ public class PlayerManager implements PlaybackListener
         {
             return this.currentPlayer.togglePlayback();
         }
-        return null;
+        return ForkJoinPool.commonPool().submit(new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                return true;
+            }
+        });
     }
 
     public ForkJoinTask<Void> stopSong()
@@ -329,7 +387,14 @@ public class PlayerManager implements PlaybackListener
             this.currentSong = null;
             return this.currentPlayer.stopSong();
         }
-        return null;
+        return ForkJoinPool.commonPool().submit(new AbstractTask<>()
+        {
+            @Override
+            protected boolean exec()
+            {
+                return true;
+            }
+        });
     }
 
     public void addPlaybackListener(PlaybackListener listener)
@@ -369,6 +434,7 @@ public class PlayerManager implements PlaybackListener
 
     /**
      * Sends an error to the browser player.
+     *
      * @param forward - Whether the error should be thrown in a foreground
      *                script or a background script.
      * @return The command future.

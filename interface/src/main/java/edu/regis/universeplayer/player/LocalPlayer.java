@@ -151,14 +151,14 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
         this.player.mediaPlayer().submit(() -> this.player.mediaPlayer()
                                                           .controls()
                                                           .play());
-        return new AbstractTask<>()
+        return this.service.submit(new AbstractTask<>()
         {
             @Override
             protected boolean exec()
             {
                 return true;
             }
-        };
+        });
     }
 
     @Override
@@ -168,14 +168,14 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
                    .submit(() -> this.player.mediaPlayer()
                                             .controls()
                                             .pause());
-        return new AbstractTask<>()
+        return this.service.submit(new AbstractTask<>()
         {
             @Override
             protected boolean exec()
             {
                 return true;
             }
-        };
+        });
     }
 
     @Override
@@ -216,14 +216,14 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
                    .submit(() -> this.player.mediaPlayer()
                                             .controls()
                                             .stop());
-        return new AbstractTask<>()
+        return this.service.submit(new AbstractTask<>()
         {
             @Override
             protected boolean exec()
             {
                 return true;
             }
-        };
+        });
     }
 
     @Override
@@ -233,14 +233,14 @@ public class LocalPlayer implements Player<LocalSong>, MediaPlayerEventListener
                    .submit(() -> this.player.mediaPlayer()
                                             .controls()
                                             .setTime((long) (time * 1000)));
-        return new AbstractTask<>()
+        return this.service.submit(new AbstractTask<>()
         {
             @Override
             protected boolean exec()
             {
                 return true;
             }
-        };
+        });
     }
 
     @Override
