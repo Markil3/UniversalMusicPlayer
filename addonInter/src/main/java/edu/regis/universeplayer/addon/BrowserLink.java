@@ -6,13 +6,21 @@ package edu.regis.universeplayer.addon;
 
 import com.google.gson.*;
 
+import com.google.gson.typeadapters.RuntimeTypeAdapterFactory;
+import edu.regis.universeplayer.PlaybackInfo;
+import edu.regis.universeplayer.PlaybackStatus;
 import edu.regis.universeplayer.browserCommands.*;
+import edu.regis.universeplayer.data.Album;
+import edu.regis.universeplayer.data.InternetSong;
+import edu.regis.universeplayer.data.Song;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Serializable;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +29,10 @@ import java.util.HashMap;
 /**
  * The browser link serves as a communication between this process and the
  * browser. It automatically converts information as needed as it passes it to
- * and from the browser process.
+ * and from the browser process. It receives browser JSON data from the
+ * system input and converts it to Java objects that the interface can read.
+ * Likewise, it will convert Java objects into JSON objects that will be sent
+ * to the browser through the system output.
  *
  * @author William Hubbard
  * @version 0.1
@@ -49,6 +60,13 @@ public class BrowserLink extends MessageRunner
         super(name, System.in, System.out);
     }
     
+    /**
+     * Converts a Java object into a data stream for sending to the browser.
+     *
+     * @param message - The Java object to send.
+     * @return The byte stream representation of the JSON object that will be
+     * sent via {@link #writeMessage(OutputStream, int, byte[])}
+     */
     @Override
     public byte[] serializeObject(Object message)
     {
@@ -60,6 +78,14 @@ public class BrowserLink extends MessageRunner
         return val.toString().getBytes(StandardCharsets.UTF_8);
     }
     
+    /**
+     * Converts data string received from the browser into a Java object.
+     *
+     * @param message - The message data stream received, as received by
+     * {@link #readMessage(InputStream)}.
+     * @return The Java that maps to the JSON data the browser sent.
+     * @throws IOException
+     */
     @Override
     public Object deserializeObject(byte[] message) throws IOException
     {
@@ -67,6 +93,21 @@ public class BrowserLink extends MessageRunner
         return getMessage(val);
     }
     
+    /**
+     * Writes a message to the output stream. It takes a byte array of JSON
+     * data and then wraps it in another object containing the "messageNum"
+     * and "message" properties before writing that stream (preceded by the
+     * message length) to the browser.
+     * <p>
+     * This implementation
+     *
+     * @param out        - The output stream to write to.
+     * @param messageNum - The ID of the message being sent. This will help keep
+     *                   track of responses.
+     * @param message    - The actual message contents to write. This will be
+     *                   a byte stream of encoded JSON data.
+     * @throws IOException
+     */
     @Override
     public void writeMessage(OutputStream out, int messageNum, byte[] message) throws IOException
     {
@@ -93,6 +134,18 @@ public class BrowserLink extends MessageRunner
         out.flush();
     }
     
+    /**
+     * Reads a message from the input stream. It expects a message length
+     * followed by an encoded JSON message. This JSON message takes the form
+     * of two objects containing a "messageNum" property and "message"
+     * (containing the actual message).
+     *
+     * @param in - The input stream to read from.
+     * @return Two byte arrays, the first one containing the identifier of the
+     * message, and the second containing the byte stream of the actual JSON
+     * message sent.
+     * @throws IOException
+     */
     @Override
     public byte[][] readMessage(InputStream in) throws IOException
     {
@@ -131,7 +184,7 @@ public class BrowserLink extends MessageRunner
         lengthBuffer.clear();
         lengthBuffer.putInt(messageNum);
         getLogger().debug("Reading message {}", messageNum);
-        return new byte[][] {lengthBuffer.array(), message};
+        return new byte[][]{lengthBuffer.array(), message};
     }
     
     /**
@@ -270,7 +323,7 @@ public class BrowserLink extends MessageRunner
         }
         return returnValue;
     }
-
+    
     @Override
     public Object getErrorObject(Throwable e)
     {

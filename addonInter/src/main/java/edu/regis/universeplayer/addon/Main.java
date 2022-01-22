@@ -17,6 +17,16 @@ import java.util.LinkedList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+/**
+ * This class is responsible for setting up the intermediary program. The
+ * program is launched by the browser addon when the browser (not a tab, the
+ * browser) has launched and the addon has loaded. It launches two forwarding
+ * streams: one between this application and the browser that translates
+ * between the JSON format the browser uses and the serialized Java objects
+ * that this program uses (working over console I/O), and a second link to
+ * communicate between the interface and the browser link over the localhost
+ * (as defined by the socket server the interface sets up).
+ */
 public class Main
 {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
@@ -29,6 +39,11 @@ public class Main
         Socket socket = null;
         try
         {
+            /*
+             * Sets up a two-way data stream to the browser through the
+             * process I/O streams. This converts between JSON data used by
+             * the browser to serializable Java objects used by the interface.
+             */
             logger.debug("Connecting to browser");
             browserLink = new BrowserLink("BrowserLink");
             try
@@ -37,6 +52,10 @@ public class Main
                 socket = new Socket(BrowserConstants.IP, BrowserConstants.PORT);
                 logger.debug("Connection established");
 
+                /*
+                 * Sets up the data stream between this application and the
+                 * interface.
+                 */
                 Socket finalSocket = socket;
                 interfaceLink = new MessageHandler("InterfaceHandler", finalSocket.getInputStream(), finalSocket.getOutputStream())
                 {
@@ -47,7 +66,7 @@ public class Main
                     {
                         /*
                          * How many milliseconds must pass between browser
-                         * pings.
+                         * pings before this stream shuts down.
                          */
                         final long PING_RATE = 5000;
                         if (!finalSocket.isConnected() || finalSocket.isClosed() || finalSocket.isInputShutdown() || finalSocket.isOutputShutdown())
@@ -56,7 +75,9 @@ public class Main
                             return true;
                         }
                         /*
-                         * Make sure that it is active.
+                         * Make sure that it is active, either with logs from
+                         * the browser or just with ping messages sent from
+                         * here.
                          */
                         if (QueueAppender.hasLogs())
                         {
@@ -92,7 +113,9 @@ public class Main
                 logger.debug("Connection received");
                 /*
                  * Pretty much just forwards any messages to the browser and
-                 * returns their value.
+                 * returns their value. This is primarily a one-way
+                 * relationship, where the interface sends commands, and the
+                 * browser returns updates and responses.
                  */
                 browserLink.addUpdateListener((update, link) ->
                 {
@@ -107,6 +130,9 @@ public class Main
                     return returnValue;
                 });
 
+                /*
+                 * Sets up both streams on their own threads.
+                 */
                 browserThread = new Thread(browserLink);
                 interfaceThread = new Thread(interfaceLink);
 
@@ -114,6 +140,9 @@ public class Main
                 browserThread.start();
                 interfaceThread.start();
                 logger.debug("Joining threads.");
+                /*
+                 * Waits for both threads to shut down.
+                 */
                 try
                 {
                     browserThread.join();
