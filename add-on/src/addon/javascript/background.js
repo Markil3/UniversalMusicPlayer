@@ -1,3 +1,52 @@
+/*
+ * Copyright (c) 2021 William Hubbard. All Rights Reserved.
+ *
+ * The background script forms the core of the addon. Running when the browser starts, it starts the native application
+ * (the intermediary program that connects to the interface). The native application will send it commands in the
+ * format of a JSON object containing a "messageNum" field (containing a session-unique identifier for that message) and
+ * "message" (containing the actual message, of which can be of any type). The message data will be forwarded to several
+ * listeners. The listeners will output a single value (or throw an error). In response to either, the addon will send
+ * a JSON object back to the native application in the following format:
+ *
+ * <code>
+ *  {
+ *      "messageNum": 0, // The ID of the message that this response corresponds to
+ *      "message": { //A wrapper that contains, among other things, the return data
+ *          "type": "edu.regis.universeplayer.browserCommands.CommandReturn", // An identifier that tells the interface to treat this data as a return value for a command
+ *          "returnValue": null, // The actual data returned by the listeners. In the event of an error, this will be null.
+ *          "confirmation": { // Contains extra metadata about how the command was executed
+ *              "type": "edu.regis.universeplayer.browserCommands.CommandConfirmation", // Another identifier for the interface
+ *              "message": "Done", // A human-readable message on the results of execution. For non-error returns, this will simply be "done."
+                "errorCode": { // If an error was thrown, this object will contain data on that. Otherwise, it will be null
+                    "type": "edu.regis.universeplayer.browserCommands.BrowserError",
+                    "name": "",
+                    "message": "",
+                    "stack", []
+ *          }
+ *      }
+ *  }
+ * </code>
+ *
+ * The default one (registered by this script) does the majority of processing. This default listener takes an object
+ * with a single "type" field that corresponds to an instance of edu.regis.universeplayer.browserCommands.BrowserQuery
+ * in the Java interface. Using that "type" field, it determines what action to take and uses extra data within the
+ * message object. Should the message be something delegated to a foreground tab (i.e. controlling a YouTube video),
+ * the listener will forward the message to the tab in the following format before returning:
+ *
+ * <code>
+ *  {
+ *      "num": 0, // The ID of the tab-specific message. This is independent of the "messageNum" field above
+ *      "message": {} // A copy of the actual message sent.
+ *  }
+ * </code>
+ *
+ * Either way,
+ *
+ * Then, whenever it receives a command from the application,
+ * it will forward that command to several listeners. One of those listeners, a default one registered by this script,
+ * does the majority of processing. If the message is marked for a specific tab (one running the foreground.js script),
+ * the message is forwarded to that tab for further processing before retrieving the value. Either way,
+ */
 let logger = new Logger("background");
 
 logger.pushUpdate = function (message)
@@ -358,6 +407,12 @@ function queryTab(tab, message)
 }
 
 /**
+ * Contains a list of listeners that will act upon messages from the native app.
+ *
+ * @see handleMessage(message)
+ */
+var listeners = [
+/**
  * A callback for when the native application sends a message.
  *
  * @param {object} message -    The message to process.
@@ -365,7 +420,7 @@ function queryTab(tab, message)
  *                              or a new value.
  * @return Either the value passed on returnValue or a new value.
  */
-var listeners = [function (message, returnValue) {
+function (message, returnValue) {
     if (typeof message == "object" && "type" in message)
     {
         let type = message.type;

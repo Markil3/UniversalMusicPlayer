@@ -14,7 +14,7 @@ import java.util.Arrays;
 public interface MessageSerializer
 {
     Logger getLogger();
-
+    
     /**
      * Converts an object into a form that can be sent.
      *
@@ -33,7 +33,7 @@ public interface MessageSerializer
             return byteStream.toByteArray();
         }
     }
-
+    
     /**
      * Converts a byte stream into an object.
      *
@@ -57,15 +57,20 @@ public interface MessageSerializer
             }
         }
     }
-
+    
     /**
      * Writes a message to the output stream.
+     * <p>
+     * By default, it will first write the number of the message (one integer
+     * of 4 bytes), and then the length of the message in bytes (another
+     * integer of four bytes). It finally writes the data stream before
+     * flushing the stream.
      *
      * @param out        - The output stream to write to.
      * @param messageNum - The ID of the message being sent. This will help keep
      *                   track of responses.
      * @param message    - The actual message contents to write.
-     * @throws IOException Thrown when an exception occures
+     * @throws IOException Thrown when an exception occurs
      */
     default void writeMessage(OutputStream out, int messageNum, byte[] message) throws IOException
     {
@@ -94,9 +99,9 @@ public interface MessageSerializer
         out.write(message);
         out.flush();
     }
-
+    
     /**
-     * Reads a message from the input stream
+     * Reads a message from the input stream.
      *
      * @param in - The input stream to read from.
      * @return Two byte arrays, each with their own value encoded. The first is
@@ -153,7 +158,7 @@ public interface MessageSerializer
         getLogger().trace("Reading message");
         return new byte[][]{messageNum, message};
     }
-
+    
     /**
      * This method is called when an error in deserialization occurs.
      *

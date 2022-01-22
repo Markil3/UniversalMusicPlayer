@@ -4,16 +4,17 @@
 
 package edu.regis.universeplayer.browser;
 
-import org.apache.logging.log4j.LogManager;
+import edu.regis.universeplayer.ConfigManager;
+import edu.regis.universeplayer.Log;
+import edu.regis.universeplayer.browserCommands.BrowserConstants;
+import edu.regis.universeplayer.browserCommands.MessageRunner;
 import org.apache.logging.log4j.core.DefaultLoggerContextAccessor;
 import org.apache.logging.log4j.core.LogEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.ConnectException;
@@ -24,43 +25,69 @@ import java.util.Arrays;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import edu.regis.universeplayer.ConfigManager;
-import edu.regis.universeplayer.Log;
-import edu.regis.universeplayer.browserCommands.BrowserConstants;
-import edu.regis.universeplayer.browserCommands.MessageRunner;
-import edu.regis.universeplayer.browserCommands.UpdateListener;
-
+/**
+ * This message runner is responsible for starting an instance of a browser
+ * and running messages to and from it. This runner provides a static method,
+ * {@link #createBrowser()}, that starts an instance of the Firefox browser.
+ * That instance contains an addon that starts up a third process, the
+ * intermediary program. The intermediary program connects to the interface
+ * and relays messages between the browser and this runner.
+ */
 public class Browser extends MessageRunner
 {
     private static final Logger logger = LoggerFactory.getLogger(Browser.class);
     private static final Logger browserLogger =
             LoggerFactory.getLogger("browser");
-
+    
     private static Browser INSTANCE;
+    /*
+     * This boolean keeps track of whether the browser has started or not.
+     * Threads that need to wait for the browser to start can wait upon this
+     * object's monitor.
+     */
     private static final AtomicBoolean instanceWaiter = new AtomicBoolean();
-
+    
+    /**
+     * Obtains the running instance of the browser.
+     *
+     * @return The running Browser instance, or null if it is not running.
+     */
     public static Browser getInstance()
     {
         return INSTANCE;
     }
-
+    
     private final Process process;
     private final ServerSocket server;
     private final Socket socket;
-
+    
     private boolean running = true;
-
+    
+    /**
+     * Launches a browser instance.
+     *
+     * @return The instance launched.
+     * @throws IOException
+     * @throws InterruptedException
+     */
     public static Browser createBrowser() throws IOException, InterruptedException
     {
         if (INSTANCE != null)
         {
             return INSTANCE;
         }
-
+        
+        /*
+         * Creates a server on the localhost. When the browser starts the
+         * intermediary program, that program will attempt to connect to this
+         * server. Any messages the browser outputs will eventually be received
+         * here, and any messages to send will first be pushed through this
+         * server.
+         */
         ServerSocket server = new ServerSocket(BrowserConstants.PORT, 50, InetAddress
                 .getByName(null));
         logger.debug("Server started.");
-
+        
         int startExit;
         Process browserProcess = launchBrowser();
         /*
@@ -85,7 +112,10 @@ public class Browser extends MessageRunner
             }
         }
         logger.debug("Browser started.");
-
+        
+        /*
+         * Waits for the intermediary program to connect to our server.
+         */
         ConnectException connErr = null;
         logger.debug("Attempting connection");
         Socket socket = server.accept();
@@ -113,12 +143,25 @@ public class Browser extends MessageRunner
         {
             logger.debug("Connection established.");
         }
+        /*
+         * Now that the socket connection has been set up, we can create the
+         * message runner.
+         */
         INSTANCE = new Browser(socket, server, browserProcess);
         instanceWaiter.set(true);
         notifyAllInstance();
         return INSTANCE;
     }
-
+    
+    /**
+     * Creates a browser message runner,
+     *
+     * @param socket  - The socket that the browser's intermediary program is
+     *                using.
+     * @param server  - The server that is hosting the above socket.
+     * @param process - The process controlling the browser instance.
+     * @throws IOException
+     */
     private Browser(Socket socket, ServerSocket server, Process process) throws IOException
     {
         super("BrowserRunner", socket.getInputStream(), socket
@@ -126,9 +169,9 @@ public class Browser extends MessageRunner
         this.socket = socket;
         this.server = server;
         this.process = process;
-
+        
         /*
-         * Sends browser logs to the main log.
+         * Automatically sends browser logs that come through to the main log.
          */
         this.addUpdateListener((object, runner) ->
         {
@@ -142,7 +185,7 @@ public class Browser extends MessageRunner
                 Object[] params = null;
                 if (log.message.length == 1 && !(log.message[0] instanceof String))
                 {
-                    log.message = new Object[] {"{}", log.message[0]};
+                    log.message = new Object[]{"{}", log.message[0]};
                 }
                 if (log.message.length == 1)
                 {
@@ -202,7 +245,13 @@ public class Browser extends MessageRunner
             }
         });
     }
-
+    
+    /**
+     * {@inheritDoc} This keeps the thread running for as long as the
+     * connection exists.
+     *
+     * @return Whether we chould stop this thread or not.
+     */
     @Override
     protected boolean onRun()
     {
@@ -214,7 +263,10 @@ public class Browser extends MessageRunner
         }
         return !this.running;
     }
-
+    
+    /**
+     * {@inheritDoc} This shuts down the socket, server, and browser process.
+     */
     @Override
     protected void onClose()
     {
@@ -243,18 +295,19 @@ public class Browser extends MessageRunner
             }
         }
     }
-
+    
     /**
-     *
+     * Called to stop the browser.
      */
     public void stop()
     {
         this.running = false;
     }
-
+    
     /**
-     * Utility method for launching a browser instance
+     * Utility method for launching a browser instance process.
      *
+     * @return The process responsible for the browser.
      * @throws IOException - Thrown if there is a problem launching the
      *                     browser.
      */
@@ -290,15 +343,23 @@ public class Browser extends MessageRunner
         {
             throw new IOException("Could not find Firefox installation for OS " + os + " " + arch);
         }
-
+        
         return process;
     }
-
-    public static void notifyInstance()
+    
+    /**
+     * Notifies a single random waiting thread that the browser message
+     * runner has started.
+     */
+    private static void notifyInstance()
     {
         instanceWaiter.notify();
     }
-
+    
+    /**
+     * Alerts all threads waiting for the browser to start that the browser has
+     * started.
+     */
     public static void notifyAllInstance()
     {
         synchronized (instanceWaiter)
@@ -306,7 +367,13 @@ public class Browser extends MessageRunner
             instanceWaiter.notifyAll();
         }
     }
-
+    
+    /**
+     * Causes the current thread to wait for the browser process to start and
+     * the message runner to properly set up.
+     *
+     * @throws InterruptedException
+     */
     public static void waitInstance() throws InterruptedException
     {
         synchronized (instanceWaiter)
@@ -314,7 +381,13 @@ public class Browser extends MessageRunner
             instanceWaiter.wait();
         }
     }
-
+    
+    /**
+     * Causes the current thread to wait for the browser process to start and
+     * the message runner to properly set up.
+     *
+     * @throws InterruptedException
+     */
     public static void waitInstance(long timeoutMillis) throws InterruptedException
     {
         synchronized (instanceWaiter)
@@ -322,7 +395,13 @@ public class Browser extends MessageRunner
             instanceWaiter.wait(timeoutMillis);
         }
     }
-
+    
+    /**
+     * Causes the current thread to wait for the browser process to start and
+     * the message runner to properly set up.
+     *
+     * @throws InterruptedException
+     */
     public static void waitInstance(long timeoutMillis, int nanos) throws InterruptedException
     {
         synchronized (instanceWaiter)

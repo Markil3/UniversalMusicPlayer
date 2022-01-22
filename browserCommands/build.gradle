@@ -1,5 +1,9 @@
 /*
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
+ *
+ * This module contains a series of classes used by multiple modules (notably, the :browser and :interface modules).
+ * Notably, it contains commands that the browser reacts to, the response structure, and data structures that is
+ * frequently passed to and from the interface and browser.
  */
 
 plugins {
@@ -21,6 +25,8 @@ dependencies {
     implementation 'org.apache.logging.log4j:log4j-api:2.13.3'
     implementation 'org.apache.logging.log4j:log4j-core:2.13.3'
     implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.13.3'
+
+    implementation 'net.harawata:appdirs:1.2.1'
 
     implementation 'net.harawata:appdirs:1.2.1'
 

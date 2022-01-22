@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2021 William Hubbard. All Rights Reserved.
+ *
+ * The foreground script serves as the core for managing playback of a song. It receives messages forwarded from the background
+ */
+
 let logger = new Logger("foreground");
 console.debug("Loading foreground.js");
 let background;
@@ -70,7 +76,16 @@ function handleMessage(message)
 
 /**
  * Calling this function will forward playback data to the browser background (and by extension, the
- * interface) as specified by the parameters.
+ * interface) as specified by the parameters. The sent data will be in the following format:
+ *
+ * <code>
+ *  {
+ *      "type": "edu.regis.universeplayer.PlaybackInfo",
+ *      "currentSong": {},
+ *      "status": "STATUS",
+ *      "playTime": 0
+ *  }
+ * </code>
  *
  * @param {string} status   The playback status. This can be "PLAYING", "PAUSED", "STOPPED",
  *                          "FINISHED", or "EMPTY"
@@ -88,7 +103,14 @@ function onStatusUpdate(status, time, songData)
 }
 
 /**
- * Forwards an update to the background (and by extension, the interface).
+ * Forwards an update to the background (and by extension, the interface). The data will be in the following format:
+ *
+ * <code>
+ *  {
+ *      "type": "update",
+ *      "data": {} // The actual data sent.
+ *  }
+ * </code>
  *
  * @param {object|Promise} response The data to forward. If this data is a Promise, then the data
  *                                  will be forwarded upon completion.
@@ -110,10 +132,16 @@ function sendUpdate(response)
 }
 
 $(function () {
+    /*
+     * Preinitializes a few things
+     */
     while (preload.length > 0)
     {
         preload.pop()();
     }
+    /*
+     * Connects to the background.
+     */
     background = browser.runtime.connect({name:"universalMusic"});
 
 //    sendUpdate("loaded");

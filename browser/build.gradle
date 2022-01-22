@@ -1,5 +1,13 @@
 /*
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
+ *
+ * This module is responsible for handling an instance of the Firefox web browser during runtime. This will install the
+ * appropriate version of Firefox Developer edition to the application installation directory, downloading it directly
+ * from Mozilla (administrator privileges are needed on Windows). It will also compile addon dependencies and add them
+ * to the install.
+ *
+ * This is all done prior to compiling the Java component of this module. The Java component is a single library that
+ * contains the appropriate methods to launch the browser and relay messages to and from the running instance.
  */
  
 import org.apache.tools.ant.taskdefs.condition.Os
@@ -12,10 +20,16 @@ plugins {
 }
 
 configurations {
+	/**
+	 * Addons are dependencies that will be added to the Firefox installation as an extension.
+	 */
 	addon {
 		canBeConsumed = false
 		canBeResolved = true
 	}
+	/**
+	 * This will be how the browser policy and addon configuration will be exported.
+	 */
 	install {
 		canBeConsumed = true
 		canBeResolved = false
@@ -49,11 +63,6 @@ repositories {
     }
 }
 
-abstract class InstallBrowserTask extends DefaultTask {
-	@OutputFile
-	final abstract DirectoryProperty installation = project.objects.directoryProperty()
-}
-
 dependencies {
 	implementation 'org.slf4j:slf4j-api:1.7.30'
 	implementation 'org.apache.logging.log4j:log4j-api:2.13.3'
@@ -64,6 +73,11 @@ dependencies {
     addon project(path: ":add-on", configuration: 'addonBuild')
 }
 
+/**
+ * Downloads the 64-bit Linux Firefox installer.
+ *
+ * @return The msi file that installs firefox.
+ */
 task downloadWindows_x86_64(type: Download) {
     src "https://download-installer.cdn.mozilla.net/pub/${firefox_module}/releases/${firefox_revision}/win64/en-US/Firefox%20Setup%20${firefox_revision}.msi"
     dest layout.buildDirectory.file("installer.msi")
@@ -71,6 +85,11 @@ task downloadWindows_x86_64(type: Download) {
 	onlyIfModified true
 }
 
+/**
+ * Downloads the 32-bit Linux Firefox installer.
+ *
+ * @return The msi file that installs firefox.
+ */
 task downloadWindows_x86(type: Download) {
     src "https://download-installer.cdn.mozilla.net/pub/${firefox_module}/releases/${firefox_revision}/win32/en-US/Firefox%20Setup%20${firefox_revision}.msi"
     dest layout.buildDirectory.file("installer.msi")
@@ -78,6 +97,11 @@ task downloadWindows_x86(type: Download) {
 	onlyIfModified true
 }
 
+/**
+ * Downloads the 64-bit Linux Firefox installation.
+ *
+ * @return The tar file that contains the Firefox download.
+ */
 task downloadLinux_x86_64(type: Download) {
     src "https://download-installer.cdn.mozilla.net/pub/${firefox_module}/releases/${firefox_revision}/linux-x86_64/en-US/firefox-${firefox_revision}.tar.bz2"
     dest layout.buildDirectory.file("installer.tar.bz2")
@@ -85,6 +109,11 @@ task downloadLinux_x86_64(type: Download) {
 	onlyIfModified true
 }
 
+/**
+ * Downloads the 32-bit Linux Firefox installation.
+ *
+ * @return The tar file that contains the Firefox download.
+ */
 task downloadLinux_i686(type: Download) {
     src "https://download-installer.cdn.mozilla.net/pub/${firefox_module}/releases/${firefox_revision}/linux-i686/en-US/firefox-${firefox_revision}.tar.bz2"
     dest layout.buildDirectory.file("installer.tar.bz2")
@@ -92,6 +121,14 @@ task downloadLinux_i686(type: Download) {
 	onlyIfModified true
 }
 
+/**
+ * Installs the 64-bit Windows Firefox to the firefox directory within the project root ($rootDir/firefox). Note that
+ * administrator privileges will be needed to properly install.
+ *
+ * This depends on the output of downloadWindows_x86_64.
+ *
+ * @return The directory Firefox was installed to.
+ */
 task installWindows_x86_64(dependsOn: downloadWindows_x86_64, type: Exec) {
 	workingDir layout.buildDirectory
 	commandLine 'msiexec', '/i', '"' + downloadWindows_x86_64.dest + '"', '/li', '"install.log"', '/qb', "INSTALL_DIRECTORY_PATH=\"$rootDir\\firefox\"", 'TASKBAR_SHORTCUT=false', 'DESKTOP_SHORTCUT=false', 'INSTALL_MAINTENANCE_SERVICE=false'
@@ -102,6 +139,14 @@ installWindows_x86_64.doFirst {
 	println "Administrator privileges needed for installing Firefox. Please confirm on the popup."
 }
 
+/**
+ * Installs the 32-bit Windows Firefox to the firefox directory within the project root ($rootDir/firefox). Note that
+ * administrator privileges will be needed to properly install.
+ *
+ * This depends on the output of downloadWindows_x86.
+ *
+ * @return The directory Firefox was installed to.
+ */
 task installWindows_x86(dependsOn: downloadWindows_x86, type: Exec) {
 	workingDir layout.buildDirectory
 	commandLine 'msiexec', '/i', '"' + downloadWindows_x86.dest + '"', '/li', '"install.log"', '/qb', "INSTALL_DIRECTORY_PATH=\"$rootDir/firefox\"", 'TASKBAR_SHORTCUT=false', 'DESKTOP_SHORTCUT=false', 'INSTALL_MAINTENANCE_SERVICE=false'
@@ -112,10 +157,20 @@ installWindows_x86.doFirst {
 	println "Administrator privileges needed for installing Firefox. Please confirm on the popup."
 }
 
+/**
+ * Removes the Firefox installation directory, $rootDir/firefox.
+ */
 task deleteFirefoxWindows(type: Delete) {
 	delete "$rootDir/firefox"
 }
 
+/**
+ * Invoke's the Firefox's Windows uninstaller.
+ *
+ * This task will call deleteFirefoxWindows.
+ *
+ * @return The directory Firefox was installed to.
+ */
 task uninstallFirefoxWindows(type: Exec) {
 	workingDir layout.buildDirectory
 	commandLine 'cmd', '/c', "$rootDir\\firefox\\uninstall\\helper.exe", '/S'
@@ -126,6 +181,13 @@ uninstallFirefoxWindows.doFirst {
 }
 uninstallFirefoxWindows.finalizedBy deleteFirefoxWindows
 
+/**
+ * Installs the 64-bit Linux Firefox to the firefox directory within the project root ($rootDir/firefox).
+ *
+ * This depends on the output of downloadLinux_x86_64.
+ *
+ * @return The directory Firefox was installed to.
+ */
 task installLinux_x86_64(dependsOn: downloadLinux_x86_64, type: Copy) {
     from(tarTree(downloadLinux_x86_64.dest)) {
 		include "firefox/**"
@@ -137,6 +199,13 @@ task installLinux_x86_64(dependsOn: downloadLinux_x86_64, type: Copy) {
 //	outputs.dir(new File(rootDir, "firefox"))
 }
 
+/**
+ * Installs the 32-bit Linux Firefox to the firefox directory within the project root ($rootDir/firefox).
+ *
+ * This depends on the output of downloadLinux_i686.
+ *
+ * @return The directory Firefox was installed to.
+ */
 task installLinux_i686(dependsOn: downloadLinux_i686, type: Copy) {
 	from(tarTree(downloadLinux_i686.dest)) {
 		include "firefox/**"
@@ -148,6 +217,14 @@ task installLinux_i686(dependsOn: downloadLinux_i686, type: Copy) {
 	outputs.dir("$rootDir/firefox")
 }
 
+/**
+ * Installs the version of Firefox appropriate for the current system.
+ *
+ * This depends on the output of installWindows_x86_64, installWindows_x86, installLinux_x86_64, or installLinux_i686,
+ * depending on the architecture.
+ *
+ * @return The directory Firefox was installed in.
+ */
 task installFirefox() {
 	if (Os.isFamily(Os.FAMILY_WINDOWS))
 	{
@@ -201,6 +278,11 @@ task installFirefox() {
 	}
 }
 
+/**
+ * Sets up the folders that addons will be stored in, the /distribution/extensions folder.
+ *
+ * This task depends on installFirefox.
+ */
 task setupProfile {
 	dependsOn installFirefox
 	doFirst {
@@ -215,10 +297,19 @@ task setupProfile {
 	}
 }
 
+/**
+ * This task sets up the policies that Firefox will use when creating new profiles. These are copied from the
+ * browserConf directory.
+ *
+ * This task depends on setupProfile.
+ */
 task movePolicies(type: Copy) {
 	dependsOn setupProfile
 	from files("browserConf")
 	into "$rootDir/firefox/"
+	/*
+	 * Registers any required addons as needed.
+	 */
 	filesMatching('**/policies.json'){
 		def pre = ""
 		for (File addon: configurations.addon.resolve())
@@ -240,6 +331,11 @@ task movePolicies(type: Copy) {
 	}
 }
 
+/**
+ * Builds all addon dependencies and copies them to the Firefox installation's distribution/extensions folder.
+ *
+ * Depends on installFirefox, setupProfile, and addon dependencies.
+ */
 task installAddons(type: Copy) {
 	dependsOn setupProfile
 	dependsOn configurations.addon
@@ -250,6 +346,11 @@ task installAddons(type: Copy) {
 	}
 }
 
+/**
+ * Zips all addons and browser policies into a conf.tar file.
+ *
+ * I don't actually remember what this is supposed to do.
+ */
 task zipPolicies(type: Tar) {
 	archiveFileName = "conf.tar"
 	destinationDirectory = file("$buildDir")
@@ -280,9 +381,15 @@ tasks.named('clean') {
 }
 println configurations.getNames()
 
+/*
+ * The java runtime requires the browser to be set up beforehand.
+ */
 compileJava.dependsOn installAddons
 compileJava.dependsOn movePolicies
 
+/*
+ * Exports the addons and policy configuration.
+ */
 artifacts {
 	install(zipPolicies)
 }

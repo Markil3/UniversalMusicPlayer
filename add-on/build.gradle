@@ -1,3 +1,12 @@
+/*
+ * Copyright (c) 2021 William Hubbard. All Rights Reserved.
+ *
+ * This module contains the browser addon that handles most of the logic for internet songs. When the :browser module is
+ * built, this addon is added to the browser's list of extensions. Then, when it is run, the addon will start the
+ * intermediary program. Then, it will receive commands from the interface through the intermediary application and
+ * manipulate the browser state based on those commands. It will then send the results of those commands back through
+ * the intermediary. The addon will also periodically shoot off updates to the browser.
+ */
 import org.apache.tools.ant.taskdefs.condition.Os
 
 import java.nio.file.Files
@@ -6,10 +15,17 @@ import java.nio.file.StandardCopyOption
 import java.util.stream.Stream
 
 configurations {
+    /**
+     * This configuration is used to export the packaged addon for installation into a browser.
+     */
     addonBuild {
         canBeConsumed = true
         canBeResolved = false
     }
+    /**
+     * The nativeApp configuration is used to import a native application that this addon will start when the browser
+     * does.
+     */
     nativeApp.extendsFrom runtime
 }
 
@@ -30,7 +46,7 @@ extension.description = "A link between the Universal Music Player and the web b
 extension.id = "universalmusic@regis.edu"
 
 /**
- * Creates an addon manifest for running
+ * Creates an addon manifest that defines details for the native application that is run when the app starts.
  */
 abstract class BuildManifest extends DefaultTask {
     @OutputFile
@@ -66,7 +82,7 @@ abstract class BuildManifest extends DefaultTask {
 }
 
 /**
- *
+ * Installs the addon manifest, adding registery keys on Windows and creating the appropriate files on Mac and Linux.
  */
 abstract class InstallAddon extends DefaultTask {
     @InputFile
@@ -97,16 +113,25 @@ dependencies {
     nativeApp project(path: ":addonInter", configuration: 'nativeBuild')
 }
 
+/**
+ * Creates a build manifest that defines details for the native application defined by nativeApp dependencies that will
+ * be run.
+ */
 tasks.register('buildManifest', BuildManifest) {
     manifests = new File(buildDir, "${extension.name.get()}.json")
 }
 
+/**
+ * Registers the build manifest to the OS, allowing for the native application to run properly.
+ * This task depends on buildManifest
+ */
 def installAddon = tasks.register('installAddon', InstallAddon) {
     inputFile = buildManifest.manifests
 }
 
 /**
  * Creates a packaged (albiet unsigned) Firefox addon from the src/main directory.
+ * This task is finished by calling installAddon
  */
 tasks.register('zipAddon', Zip) {
     dependsOn configurations.nativeApp
@@ -146,6 +171,9 @@ tasks.register("clean", Delete) {
     followSymlinks = false
 }
 
+/*
+ * Exports the packaged addon task.
+ */
 artifacts {
     addonBuild(zipAddon)
 }

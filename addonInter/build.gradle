@@ -1,13 +1,11 @@
-import org.apache.tools.ant.taskdefs.condition.Os
-
-import java.lang.reflect.Method
-import java.nio.file.Files
-import java.nio.file.Paths
-import java.nio.file.StandardCopyOption
-import java.util.stream.Stream
-
 /*
  * Copyright (c) 2021 William Hubbard. All Rights Reserved.
+ *
+ * This module contains a program separate from both the browser and the interface. Firefox's native messaging API can
+ * only start a process, it can't communicate with a process that is already running. That is where this module comes
+ * in. The browser will start this module, and the interface will create a server over the localhost. When this program
+ * is started, it connects to that server. It will then relay messages between the browser and interface, translating
+ * between JSON and serialized Java objects as needed.
  */
 plugins {
     id 'java'
@@ -16,10 +14,17 @@ plugins {
 }
 
 configurations {
+    /**
+     * The native build artifact is used by the addon build process to ensure that it knows where the executable can be
+     * found. This is because the addon needs to have the executable registered on install.
+     */
     nativeBuild {
         canBeConsumed = true
         canBeResolved = false
     }
+    /**
+     * The install configuration is used for when we are packaging up the intermediary program.
+     */
     install {
         canBeConsumed = true
         canBeResolved = false
